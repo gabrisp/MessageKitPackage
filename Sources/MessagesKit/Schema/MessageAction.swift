@@ -77,6 +77,15 @@ public struct MessageAction: Sendable, Hashable, Codable {
         }
     }
 
+    /// Si cierra el mensaje en el que está. En uno que no se puede cerrar, los botones lo dejan
+    /// abierto salvo que digan explícitamente que cierran (o sean «Cerrar»): un alert de Pro con
+    /// un botón al paywall sigue ahí hasta que el usuario paga (y entonces se quita solo).
+    public func closes(messageDismissible: Bool) -> Bool {
+        if case .dismiss = kind { return true }
+        if let thenDismiss { return thenDismiss }
+        return messageDismissible && dismisses
+    }
+
     /// Identificador estable para impresiones: `trackAs` o el tipo con su destino.
     public var trackingId: String {
         if let trackAs, !trackAs.isEmpty { return trackAs }

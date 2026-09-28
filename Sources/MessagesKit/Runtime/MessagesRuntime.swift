@@ -80,6 +80,8 @@ final class MessagesRuntime {
     /// Las capacidades (rutas y acciones) de la última petición al hub.
     private var sentCapabilities: Capabilities?
     private var capabilitiesTask: Task<Void, Never>?
+    /// Las campañas que le siguen tocando (última respuesta del hub), para quitar la que ya no.
+    private var activeIds: Set<String>?
 
     init(presenter: MessagePresenter) {
         self.presenter = presenter
@@ -226,8 +228,30 @@ final class MessagesRuntime {
             state.etag = response.etag
             for f in forced where !state.forced.contains(where: { $0.id == f.id }) { state.forced.append(f) }
             MessagesLog.debug("Hub: \(state.campaigns.count) campañas, \(forced.count) forzadas")
+            if let active = response.active {
+                activeIds = Set(active)
+                removeNoLongerActive()
+            }
         }
         scheduleSave()
+    }
+
+    /// Lo que está en pantalla o esperando y ya no le toca (se ha hecho Pro, ya no cumple la
+    /// audiencia, se ha pausado…) se quita. Las pruebas no: esas se ven hasta que se cierran.
+    private func removeNoLongerActive() {
+        guard let activeIds else { return }
+        func gone(_ r: MessageRequest) -> Bool {
+            r.mode == .live && r.campaign.forced != true && !activeIds.contains(r.campaign.id)
+        }
+        presenter.removeQueued(where: gone)
+        for (id, task) in pending where !activeIds.contains(id) {
+            task.cancel()
+            pending[id] = nil
+        }
+        if let current = presenter.current, gone(current) {
+            MessagesLog.debug("«\(current.campaign.name)» ya no le toca: se quita")
+            presenter.dismiss(.programmatic, id: current.id)
+        }
     }
 
     /// Una ruta o acción registrada después de pedir los mensajes: el hub no sirve campañas con
@@ -419,7 +443,8 @@ final class MessagesRuntime {
     func perform(_ action: MessageAction, from r: MessageRequest?) {
         // Si el mensaje se cierra, la acción espera a que termine de irse (un sheet de la
         // app no puede salir mientras se cierra el nuestro).
-        let waits = action.dismisses && (r?.style == .sheet || r?.style == .fullscreen)
+        let waits = (r.map { action.closes(messageDismissible: $0.dismissible) } ?? false)
+            && (r?.style == .sheet || r?.style == .fullscreen)
         Task {
             if waits { try? await Task.sleep(for: .milliseconds(550)) }
             execute(action)

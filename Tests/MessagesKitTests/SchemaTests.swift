@@ -114,15 +114,19 @@ struct ValidationTests {
         }
     }
 
-    @Test("No dismisseable sin salida no se puede publicar")
+    @Test("No dismisseable: sin botones no se publica; sin botón que cierre, solo aviso")
     func nonDismissibleNeedsExit() {
         var c = Campaign(name: "x", appIds: ["rewearly"], dismissible: false, content: ["es": [
             Block(.heading(.init(text: "Hola"))),
-            Block(.button(.init(title: "Copiar", action: MessageAction(.copy(text: "a", toast: nil))))),
         ]])
         #expect(CampaignValidator.validate(c, apps: [app]).contains { $0.severity == .error })
+        // Un botón al paywall: se queda hasta que deja de cumplir la audiencia (se hace Pro).
+        c.content["es"]!.append(Block(.button(.init(title: "Hazte Pro", action: MessageAction(.route(name: "paywall", params: [:]))))))
+        let issues = CampaignValidator.validate(c, apps: [app])
+        #expect(!issues.contains { $0.severity == .error })
+        #expect(issues.contains { $0.severity == .warning && $0.message.contains("Ningún botón") })
         c.content["es"]!.append(Block(.button(.init(title: "Vale", action: .dismiss))))
-        #expect(!CampaignValidator.validate(c, apps: [app]).contains { $0.severity == .error })
+        #expect(!CampaignValidator.validate(c, apps: [app]).contains { $0.message.contains("Ningún botón") })
     }
 
     @Test("Rutas que la app no declara")

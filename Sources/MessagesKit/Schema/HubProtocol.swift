@@ -49,6 +49,9 @@ public struct MessagesResponse: Sendable, Codable {
     /// Por qué el hub no le sirve nada (salvo pruebas): `quiet` (silencio tras instalar o hasta
     /// acabar el onboarding) o `dailyCap` (ya ha visto el máximo del día).
     public var blocked: String?
+    /// Las campañas que le siguen tocando a este usuario (sin contar frecuencia ni tope). Si la
+    /// que está en pantalla ya no está, se quita. `nil` con un hub antiguo.
+    public var active: [String]?
 
     public init(campaigns: [Campaign] = [], dailyCap: Int = 0, serverTime: Date = .now, etag: String = "", ttlSeconds: Double = 300, notModified: Bool = false, blocked: String? = nil) {
         self.campaigns = campaigns; self.dailyCap = dailyCap; self.serverTime = serverTime
@@ -64,6 +67,7 @@ public struct MessagesResponse: Sendable, Codable {
         ttlSeconds = c.value(.ttlSeconds, default: 300)
         notModified = c.value(.notModified, default: false)
         blocked = try? c.decodeIfPresent(String.self, forKey: .blocked)
+        active = try? c.decodeIfPresent([String].self, forKey: .active)
     }
 }
 

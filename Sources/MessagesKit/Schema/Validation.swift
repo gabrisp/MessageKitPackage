@@ -51,9 +51,12 @@ public enum CampaignValidator {
 
         // No dismisseable: tiene que haber una salida.
         if !c.dismissible {
-            let resolves = defaultBlocks.flatMap(\.actions).contains(where: \.dismisses)
-            if !resolves {
-                error(L.string("Una campaña que no se puede cerrar necesita al menos un botón que la cierre o la resuelva.", "A non-dismissible campaign needs at least one button that closes or resolves it."))
+            let actions = defaultBlocks.flatMap(\.actions)
+            if actions.isEmpty {
+                error(L.string("Una campaña que no se puede cerrar necesita al menos un botón.", "A non-dismissible campaign needs at least one button."))
+            } else if !actions.contains(where: { $0.closes(messageDismissible: false) }) {
+                warning(L.string("Ningún botón la cierra: se queda en pantalla hasta que el usuario deje de estar en la audiencia (p. ej. al hacerse Pro) o la pauses. Si quieres que un botón la cierre, en «Después» elige «Cierra el mensaje».",
+                                 "No button closes it: it stays on screen until the user leaves the audience (e.g. goes Pro) or you pause it. To let a button close it, set “Then” to “Close the message”."))
             }
             if c.presentation.style == .toast {
                 error(L.string("Un toast siempre se va solo: no puede ser no dismisseable.", "A toast always goes away on its own: it can't be non-dismissible."))

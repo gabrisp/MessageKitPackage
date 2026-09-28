@@ -84,6 +84,20 @@ struct AppReportTests {
         #expect(empty.merged(into: existing).bundleId == "com.example.wrong", "Sin bundle en el informe, se queda el que había")
     }
 
+    @Test("En un mensaje que no se puede cerrar, los botones no lo cierran salvo que lo digan")
+    func nonDismissibleButtons() {
+        let paywall = MessageAction(.route(name: "paywall", params: [:]))
+        #expect(paywall.closes(messageDismissible: true))
+        #expect(!paywall.closes(messageDismissible: false))
+        var explicit = paywall
+        explicit.thenDismiss = true
+        #expect(explicit.closes(messageDismissible: false))
+        #expect(MessageAction(.dismiss).closes(messageDismissible: false))
+        var stays = paywall
+        stays.thenDismiss = false
+        #expect(!stays.closes(messageDismissible: true))
+    }
+
     @Test("Tipo de atributo deducido del valor")
     func inferredKinds() {
         #expect(AppConfig.Attribute.Kind.inferred(from: true) == .bool)

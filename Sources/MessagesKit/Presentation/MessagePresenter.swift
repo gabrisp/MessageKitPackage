@@ -210,10 +210,10 @@ public final class MessagePresenter {
             } else {
                 // Si el mensaje se cierra, el destino sale cuando ya se ha ido (como en la app).
                 openTestDestination(action, campaign: request.campaign, language: request.language,
-                                    after: action.dismisses && current?.id == request.id ? .milliseconds(550) : .zero)
+                                    after: action.closes(messageDismissible: request.dismissible) && current?.id == request.id ? .milliseconds(550) : .zero)
             }
         }
-        if action.dismisses, current?.id == request.id {
+        if action.closes(messageDismissible: request.dismissible), current?.id == request.id {
             dismiss(.action, id: request.id)
         }
     }
