@@ -43,10 +43,13 @@ public struct MessagesResponse: Sendable, Codable {
     public var etag: String
     public var ttlSeconds: Double
     public var notModified: Bool
+    /// Por qué el hub no le sirve nada (salvo pruebas): `quiet` (silencio tras instalar o hasta
+    /// acabar el onboarding) o `dailyCap` (ya ha visto el máximo del día).
+    public var blocked: String?
 
-    public init(campaigns: [Campaign] = [], dailyCap: Int = 0, serverTime: Date = .now, etag: String = "", ttlSeconds: Double = 300, notModified: Bool = false) {
+    public init(campaigns: [Campaign] = [], dailyCap: Int = 0, serverTime: Date = .now, etag: String = "", ttlSeconds: Double = 300, notModified: Bool = false, blocked: String? = nil) {
         self.campaigns = campaigns; self.dailyCap = dailyCap; self.serverTime = serverTime
-        self.etag = etag; self.ttlSeconds = ttlSeconds; self.notModified = notModified
+        self.etag = etag; self.ttlSeconds = ttlSeconds; self.notModified = notModified; self.blocked = blocked
     }
 
     public init(from decoder: Decoder) throws {
@@ -57,6 +60,7 @@ public struct MessagesResponse: Sendable, Codable {
         etag = c.value(.etag, default: "")
         ttlSeconds = c.value(.ttlSeconds, default: 300)
         notModified = c.value(.notModified, default: false)
+        blocked = try? c.decodeIfPresent(String.self, forKey: .blocked)
     }
 }
 

@@ -143,7 +143,15 @@ struct SyncStatusView: View {
                     } else {
                         Text(L.string("\(s.campaigns) campañas para este usuario\(s.notModified ? " (sin cambios)" : "")",
                                       "\(s.campaigns) campaigns for this user\(s.notModified ? " (unchanged)" : "")"))
-                        if s.campaigns == 0 {
+                        if s.blocked == "dailyCap" {
+                            Text(L.string("Tope diario alcanzado: hoy ya ha visto el máximo de mensajes (Apps → Límites en el admin). Las pruebas no cuentan.",
+                                          "Daily cap reached: this user has already seen today's maximum (Apps → Limits in the admin). Tests don't count."))
+                                .foregroundStyle(.orange)
+                        } else if s.blocked == "quiet" {
+                            Text(L.string("En silencio: recién instalada u onboarding sin acabar (Apps → Límites en el admin).",
+                                          "Quiet: just installed or onboarding not finished (Apps → Limits in the admin)."))
+                                .foregroundStyle(.orange)
+                        } else if s.campaigns == 0 {
                             Text(L.string("Si esperabas alguna: ¿está publicada, es para esta app, y si va a usuarios concretos, está este userId?",
                                           "If you expected one: is it published, for this app, and if it targets specific users, is this userId there?"))
                                 .foregroundStyle(.secondary)

@@ -10,6 +10,9 @@ public struct SyncStatus: Sendable, Hashable {
     /// Campañas que el hub le sirve a este usuario ahora (sin contar las forzadas).
     public var campaigns: Int
     public var notModified: Bool
+    /// Por qué el hub no le sirve nada: `quiet` (silencio tras instalar o hasta acabar el
+    /// onboarding) o `dailyCap` (ya ha visto el máximo de mensajes de hoy). `nil` si nada lo bloquea.
+    public var blocked: String?
     /// El error, si falló.
     public var error: String?
     public var duration: Duration
@@ -189,11 +192,18 @@ final class MessagesRuntime {
                 let response = try await client.call("messages", request, as: MessagesResponse.self)
                 apply(response)
                 lastSync = SyncStatus(date: .now, userId: uid, ok: true, campaigns: state.campaigns.count,
-                                      notModified: response.notModified, error: nil, duration: ContinuousClock.now - started)
+                                      notModified: response.notModified, blocked: response.blocked, error: nil,
+                                      duration: ContinuousClock.now - started)
                 MessagesLog.debug("Hub OK: \(state.campaigns.count) campañas para \(uid)")
+                switch response.blocked {
+                case "dailyCap": MessagesLog.error("Tope diario alcanzado (\(response.dailyCap)): hoy no se le sirven más mensajes a \(uid)")
+                case "quiet": MessagesLog.error("En silencio (recién instalada u onboarding sin acabar): no se le sirven mensajes a \(uid)")
+                default: break
+                }
             } catch {
                 lastSync = SyncStatus(date: .now, userId: uid, ok: false, campaigns: state.campaigns.count,
-                                      notModified: false, error: error.localizedDescription, duration: ContinuousClock.now - started)
+                                      notModified: false, blocked: nil, error: error.localizedDescription,
+                                      duration: ContinuousClock.now - started)
                 MessagesLog.error("No se pudieron pedir los mensajes: \(error.localizedDescription)")
             }
         }
@@ -307,16 +317,27 @@ final class MessagesRuntime {
 
     // MARK: Impresiones
 
+    /// Una prueba ("Enviar prueba") no cuenta para la frecuencia ni para el tope diario, ni aquí
+    /// ni en el hub (sus impresiones van con `actionId: "preview"`): probar no gasta la campaña real.
+    private func isPreview(_ r: MessageRequest) -> Bool { r.campaign.forced == true }
+
     private func didShow(_ r: MessageRequest) {
         let id = r.campaign.id
-        state.history[id, default: .init()].shown.append(.now)
         state.forced.removeAll { $0.id == id }
+        if isPreview(r) {
+            record(.shown, r, actionId: Self.previewActionId)
+            return
+        }
+        state.history[id, default: .init()].shown.append(.now)
         record(.shown, r)
     }
+
+    static let previewActionId = "preview"
 
     private func didDismiss(_ r: MessageRequest, reason: DismissReason) {
         switch reason {
         case .closeButton, .gesture:
+            if isPreview(r) { record(.dismissed, r, actionId: Self.previewActionId); return }
             state.history[r.campaign.id, default: .init()].dismissedAt = .now
             record(.dismissed, r, actionId: reason.rawValue)
         case .auto, .action, .programmatic:
@@ -325,7 +346,10 @@ final class MessagesRuntime {
     }
 
     private func didTap(_ action: MessageAction, in r: MessageRequest) {
-        if case .dismiss = action.kind {
+        if isPreview(r) {
+            // Se apunta qué se pulsó (el admin lo enseña), pero sin tocar el historial de la campaña.
+            record(action.kind.isDismiss ? .dismissed : .clicked, r, actionId: "\(Self.previewActionId):\(action.trackingId)")
+        } else if case .dismiss = action.kind {
             state.history[r.campaign.id, default: .init()].dismissedAt = .now
             record(.dismissed, r, actionId: action.trackingId)
         } else {
@@ -670,5 +694,12 @@ extension JSONValue {
         case .object(let o): o.mapValues(\.anySendable)
         case .null: Optional<String>.none as any Sendable
         }
+    }
+}
+
+extension MessageAction.Kind {
+    var isDismiss: Bool {
+        if case .dismiss = self { return true }
+        return false
     }
 }
