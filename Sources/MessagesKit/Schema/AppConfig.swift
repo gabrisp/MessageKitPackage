@@ -20,6 +20,47 @@ public struct AppConfig: Sendable, Hashable, Codable, Identifiable {
         }
     }
 
+    /// Un atributo propio de la app para las reglas de audiencia (`garmentCount`, `followers`…).
+    /// Solo sirve al admin para ofrecerlo en el constructor de reglas con el control adecuado;
+    /// la app lo manda en `attributes` y el hub lo evalúa sin necesitar esta declaración.
+    public struct Attribute: Sendable, Hashable, Codable, Identifiable {
+        public enum Kind: String, Sendable, Hashable, Codable, CaseIterable {
+            case bool, number, string, version, date, list
+        }
+
+        public var name: String
+        public var kind: Kind
+        public var description: String?
+        public var id: String { name }
+
+        public init(name: String, kind: Kind = .string, description: String? = nil) {
+            self.name = name; self.kind = kind; self.description = description
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            name = try c.decode(String.self, forKey: .name)
+            kind = c.value(.kind, default: .string)
+            description = c.optional(.description)
+        }
+
+        /// Los que manda MessagesKit en todas las apps.
+        public static let builtIn: [Attribute] = [
+            .init(name: "isPro", kind: .bool, description: "Suscripción activa (lo manda la app)"),
+            .init(name: "language", kind: .string, description: "Idioma del usuario (es, en…)"),
+            .init(name: "country", kind: .string, description: "Región (ES, MX…)"),
+            .init(name: "appVersion", kind: .version, description: "Versión de la app"),
+            .init(name: "build", kind: .version, description: "Build"),
+            .init(name: "platform", kind: .string, description: "ios o macos"),
+            .init(name: "osVersion", kind: .version, description: "Versión del sistema"),
+            .init(name: "installDate", kind: .date, description: "Primera vez que se abrió"),
+            .init(name: "daysSinceInstall", kind: .number, description: "Días desde la instalación"),
+            .init(name: "pushAuthorized", kind: .bool, description: "Avisos permitidos"),
+            .init(name: "onboardingCompleted", kind: .bool, description: "Onboarding terminado (lo manda la app)"),
+            .init(name: "timezone", kind: .string, description: "Zona horaria (Europe/Madrid…)"),
+        ]
+    }
+
     /// Una ruta (pantalla u hoja propia de la app) o una acción propia.
     public struct Capability: Sendable, Hashable, Codable {
         public var description: String?
@@ -47,6 +88,8 @@ public struct AppConfig: Sendable, Hashable, Codable, Identifiable {
     public var screens: [String]
     /// Eventos que manda la app, para los menús del admin.
     public var events: [String]
+    /// Atributos propios de la app para las reglas de audiencia (los de serie no hace falta).
+    public var attributes: [Attribute]
     public var theme: ThemeSpec
     /// Máximo de mensajes al día por usuario (todas las campañas). 0 = sin tope.
     public var dailyCap: Int
@@ -63,13 +106,13 @@ public struct AppConfig: Sendable, Hashable, Codable, Identifiable {
     public init(
         appId: String, name: String, bundleId: String = "", languages: [String] = ["es", "en"],
         defaultLanguage: String = "es", routes: [String: Capability] = [:], customActions: [String: Capability] = [:],
-        screens: [String] = [], events: [String] = [], theme: ThemeSpec = .init(), dailyCap: Int = 2,
+        screens: [String] = [], events: [String] = [], attributes: [Attribute] = [], theme: ThemeSpec = .init(), dailyCap: Int = 2,
         quietHoursAfterInstall: Double = 24, quietUntilOnboarding: Bool = true, publicKey: String = AppConfig.newPublicKey(),
         posthogURL: String? = nil
     ) {
         self.appId = appId; self.name = name; self.bundleId = bundleId; self.languages = languages
         self.defaultLanguage = defaultLanguage; self.routes = routes; self.customActions = customActions
-        self.screens = screens; self.events = events; self.theme = theme; self.dailyCap = dailyCap
+        self.screens = screens; self.events = events; self.attributes = attributes; self.theme = theme; self.dailyCap = dailyCap
         self.quietHoursAfterInstall = quietHoursAfterInstall; self.quietUntilOnboarding = quietUntilOnboarding
         self.publicKey = publicKey; self.posthogURL = posthogURL
     }
@@ -89,6 +132,7 @@ public struct AppConfig: Sendable, Hashable, Codable, Identifiable {
         customActions = c.value(.customActions, default: [:])
         screens = c.value(.screens, default: [])
         events = c.value(.events, default: [])
+        attributes = c.value(.attributes, default: [])
         theme = c.value(.theme, default: .init())
         dailyCap = c.value(.dailyCap, default: 2)
         quietHoursAfterInstall = c.value(.quietHoursAfterInstall, default: 24)
