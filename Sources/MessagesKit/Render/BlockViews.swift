@@ -396,18 +396,18 @@ public struct MessageButton: View {
         switch button.style {
         case .primary:
             Button(action: tap) { label }
-                .buttonStyle(.glassProminent)
+                .messageButtonStyle(prominent: true)
                 .tint(theme.accent)
         case .destructive:
             Button(action: tap) { label }
-                .buttonStyle(.glassProminent)
+                .messageButtonStyle(prominent: true)
                 .tint(theme.color("danger"))
         case .secondary:
             Button(action: tap) { label.foregroundStyle(theme.color("primaryText")) }
-                .buttonStyle(.glass)
+                .messageButtonStyle(prominent: false)
         case .glass:
             Button(action: tap) { label.foregroundStyle(theme.accent) }
-                .buttonStyle(.glass)
+                .messageButtonStyle(prominent: false)
         case .link:
             Button(action: tap) { label.foregroundStyle(theme.accent) }
                 .buttonStyle(.plain)
@@ -420,7 +420,7 @@ struct ButtonRowView: View {
     let row: Block.ButtonRow
 
     var body: some View {
-        GlassEffectContainer(spacing: 10) {
+        MessageGlassGroup(spacing: 10) {
             HStack(spacing: 10) {
                 ForEach(row.buttons) { MessageButton(button: $0) }
             }
@@ -504,7 +504,7 @@ struct WebBlockView: View {
     var body: some View {
         Group {
             if let url = URL(string: block.url), url.scheme == "https" {
-                WebView(url: url)
+                MessageWebView(url: url)
             } else {
                 Rectangle().fill(.quaternary)
                     .overlay { Image(systemName: "exclamationmark.triangle").foregroundStyle(.secondary) }

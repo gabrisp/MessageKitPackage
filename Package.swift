@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "MessagesKit",
     defaultLocalization: "es",
-    platforms: [.iOS(.v26), .macOS(.v26)],
+    platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "MessagesKit", targets: ["MessagesKit"]),
     ],

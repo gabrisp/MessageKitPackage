@@ -19,7 +19,7 @@ public struct MessagesDebugView: View {
                             .font(.footnote).foregroundStyle(.secondary)
                         CopyAdminConfigButton()
                             .frame(maxWidth: .infinity)
-                        .buttonStyle(.glassProminent)
+                        .messageButtonStyle(prominent: true)
                     }
                     .padding(16)
                 }
@@ -52,7 +52,7 @@ public struct MessagesDebugView: View {
                         Button(L.string("Pintar", "Render")) {
                             do { try Messages.preview(json: json); error = nil } catch { self.error = String(describing: error) }
                         }
-                        .buttonStyle(.glassProminent)
+                        .messageButtonStyle(prominent: true)
                         .disabled(json.isEmpty)
                     }
                     .padding(16)
@@ -61,7 +61,7 @@ public struct MessagesDebugView: View {
                     Messages.resetLocalState()
                     campaigns = []
                 }
-                .buttonStyle(.glass)
+                .messageButtonStyle(prominent: false)
             }
             .padding(20)
         }

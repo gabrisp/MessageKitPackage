@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// El aspecto de los mensajes en una app: colores (por token), tipografía, radios y el
-/// tinte del cristal. El cristal en sí es siempre el nativo de Liquid Glass.
+/// tinte del cristal. El cristal en sí es el nativo de Liquid Glass (iOS 26); antes, un material.
 public struct MessagesTheme: Sendable {
     /// Token → color. Tokens estándar: `accent`, `primaryText`, `secondaryText`,
     /// `background`, `positive`, `warning`, `danger`.
@@ -78,6 +78,7 @@ public struct MessagesTheme: Sendable {
     }
 
     /// El cristal del tema para una superficie (tarjeta, banner, toast).
+    @available(iOS 26.0, macOS 26.0, *)
     func surfaceGlass(interactive: Bool = false) -> Glass {
         var g: Glass = glass == .clear ? .clear : .regular
         if let glassTint { g = g.tint(glassTint) }

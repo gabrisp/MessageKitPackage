@@ -33,7 +33,7 @@ struct AlertCard: View {
     @Environment(\.messagesTheme) private var theme
 
     var body: some View {
-        GlassEffectContainer(spacing: 12) {
+        MessageGlassGroup(spacing: 12) {
             ViewThatFits(in: .vertical) {
                 content
                 ScrollView { content }.scrollBounceBehavior(.basedOnSize)
@@ -42,7 +42,7 @@ struct AlertCard: View {
             .overlay(alignment: .topTrailing) {
                 if dismissible { CloseButton(action: onClose).padding(14) }
             }
-            .glassEffect(theme.surfaceGlass(), in: .rect(cornerRadius: theme.cardRadius, style: .continuous))
+            .messageSurface(theme, in: .rect(cornerRadius: theme.cardRadius, style: .continuous))
         }
         .environment(\.messageSurface, .alert)
         .accessibilityElement(children: .contain)
@@ -124,7 +124,7 @@ struct BannerCard: View {
         .padding(.vertical, 14)
         .frame(maxWidth: 520)
         .contentShape(.rect(cornerRadius: 26))
-        .glassEffect(theme.surfaceGlass(interactive: tapAction != nil), in: .rect(cornerRadius: 26, style: .continuous))
+        .messageSurface(theme, interactive: tapAction != nil, in: .rect(cornerRadius: 26, style: .continuous))
         .offset(y: drag)
         .onTapGesture { if let tapAction { onTap(tapAction) } }
         .gesture(dismissible ? swipe : nil)
@@ -182,7 +182,7 @@ struct ToastCapsule: View {
         .fontDesign(theme.fontDesign)
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
-        .glassEffect(theme.surfaceGlass(), in: .capsule)
+        .messageSurface(theme, in: .capsule)
         .environment(\.messageSurface, .toast)
         .accessibilityElement(children: .combine)
     }
@@ -207,7 +207,7 @@ struct SheetMessageContent: View {
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { onHeight?($0) }
         }
         .scrollBounceBehavior(.basedOnSize)
-        .scrollEdgeEffectStyle(.soft, for: .top)
+        .messageSoftScrollEdge(.top)
         .overlay(alignment: .topTrailing) {
             if dismissible { CloseButton(action: onClose).padding(16) }
         }
@@ -240,7 +240,7 @@ struct FullscreenMessageContent: View {
                             }
                         }
                         .clipped()
-                        .backgroundExtensionEffect()
+                        .messageBackgroundExtension()
                         .accessibilityLabel(hero.alt ?? "")
                         .accessibilityHidden(hero.alt == nil)
                 }
@@ -254,14 +254,14 @@ struct FullscreenMessageContent: View {
         }
         .ignoresSafeArea(edges: hero == nil ? [] : .top)
         .scrollBounceBehavior(.basedOnSize)
-        .scrollEdgeEffectStyle(.soft, for: .all)
+        .messageSoftScrollEdge(.all)
         .background(theme.color("background").ignoresSafeArea())
         .overlay(alignment: .topTrailing) {
             if dismissible {
                 Button(action: onClose) {
                     Image(systemName: "xmark").font(.body.weight(.semibold)).frame(width: 24, height: 24).contentShape(.circle)
                 }
-                .buttonStyle(.glass)
+                .messageButtonStyle(prominent: false)
                 .buttonBorderShape(.circle)
                 .controlSize(.large)
                 .padding(16)
@@ -288,7 +288,7 @@ struct TestNoticeView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .frame(maxWidth: 460)
-        .glassEffect(.regular, in: .rect(cornerRadius: 20, style: .continuous))
+        .messagePlainSurface(in: .rect(cornerRadius: 20, style: .continuous))
         .accessibilityElement(children: .combine)
     }
 }

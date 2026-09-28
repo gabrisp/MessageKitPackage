@@ -2,8 +2,8 @@
 
 Mensajes a los usuarios de tus apps (ya publicadas en el App Store) que se crean y cambian desde el servidor, sin sacar una versión nueva cada vez: alerts de cristal, banners, toasts, sheets construidos con bloques y pantalla completa, con acciones, disparadores, audiencia, frecuencia, impresiones y pushes.
 
-- iOS 26+ (y macOS 26+ para el admin). Swift 6. Sin dependencias.
-- Liquid Glass nativo: `.glassEffect`, `.glass`/`.glassProminent`, `GlassEffectContainer`.
+- iOS 17+ y macOS 14+. Swift 6. Sin dependencias.
+- En iOS 26 usa Liquid Glass nativo (`.glassEffect`, `.glass`/`.glassProminent`, `GlassEffectContainer`). En iOS 17–25 los mismos mensajes salen con materiales del sistema y botones `.borderedProminent`/`.bordered`, sin hacer nada en la app.
 - Habla por REST con un hub de Appwrite (funciones `messages`, `events` y `devices`). **La app no lleva ninguna API key**: solo el `appId` y la clave pública de la app, que no es secreta.
 - El hub decide **a quién** y **cuántas veces**; la app, **en qué momento** (disparadores).
 
