@@ -63,6 +63,8 @@ final class MessagesRuntime {
     private var lastPhase: ScenePhase?
     private var pending: [String: Task<Void, Never>] = [:]
     private var refreshTask: Task<Void, Never>?
+    /// Cuántas peticiones al hub se han empezado (para no repetir una que ya se ha rehecho).
+    private var refreshGeneration = 0
     private var flushTask: Task<Void, Never>?
     private var saveTask: Task<Void, Never>?
     private var cachedUserId: String?
@@ -177,10 +179,19 @@ final class MessagesRuntime {
         if !force, let fetched = state.fetchedAt, Date.now.timeIntervalSince(fetched) < min(state.ttlSeconds, 300) { return }
         // Una en marcha: sin `force` vale su resultado; con `force` se espera y se vuelve a pedir,
         // porque la que estaba en marcha salió con los atributos de antes (p. ej. aún no era Pro).
-        while let running = refreshTask {
+        // Sin bucles: esperar a una tarea ya terminada no suspende, y un `while` aquí se quedaba
+        // girando en el hilo principal (la app se congelaba).
+        if let running = refreshTask {
+            let generation = refreshGeneration
             await running.value
-            if !force { return }
+            guard force else { return }
+            // Mientras se esperaba, otra llamada ya ha vuelto a pedir: vale esa.
+            if refreshGeneration != generation {
+                if let newer = refreshTask { await newer.value }
+                return
+            }
         }
+        refreshGeneration += 1
         let task = Task {
             let started = ContinuousClock.now
             let uid = await userId()
@@ -216,7 +227,7 @@ final class MessagesRuntime {
         }
         refreshTask = task
         await task.value
-        refreshTask = nil
+        if refreshTask == task { refreshTask = nil }
     }
 
     private func apply(_ response: MessagesResponse) {
@@ -696,8 +707,11 @@ final class MessagesRuntime {
         out["installDate"] = .string(ISO8601.string(from: install))
         out["daysSinceInstall"] = .number(Double(Calendar.current.dateComponents([.day], from: install, to: .now).day ?? 0))
         out["timezone"] = .string(TimeZone.current.identifier)
-        let settings = await UNUserNotificationCenter.current().notificationSettings()
-        out["pushAuthorized"] = .bool(settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional)
+        // Solo dentro de una app: fuera de un bundle `.app` (tests, herramientas) el centro de avisos rompe.
+        if Bundle.main.bundleURL.pathExtension == "app" {
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            out["pushAuthorized"] = .bool(settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional)
+        }
         if let custom = await config?.attributes() {
             for (k, v) in custom { out[k] = JSONValue(any: v) }
         }

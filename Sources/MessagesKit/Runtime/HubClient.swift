@@ -20,6 +20,8 @@ actor HubClient {
     let endpoint: URL
     let projectId: String
     private let session: URLSession
+    /// Solo para tests: respuestas simuladas (un `URLProtocol`) en vez de la red.
+    nonisolated(unsafe) static var testProtocolClasses: [AnyClass]?
 
     init(endpoint: URL, projectId: String) {
         self.endpoint = endpoint
@@ -29,6 +31,7 @@ actor HubClient {
         cfg.waitsForConnectivity = false
         cfg.httpCookieStorage = nil
         cfg.httpShouldSetCookies = false
+        if let stubs = Self.testProtocolClasses { cfg.protocolClasses = stubs }
         session = URLSession(configuration: cfg)
     }
 
