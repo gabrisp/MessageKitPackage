@@ -32,6 +32,9 @@ public struct MessagesRequest: Sendable, Codable {
     /// La `etag` de la última respuesta; si nada ha cambiado vuelve `notModified: true`.
     public var etag: String?
     public var sdkVersion: String
+    /// La campaña de un push que el usuario acaba de tocar: el hub la sirve aunque se haya
+    /// llegado al tope o a la frecuencia.
+    public var open: String? = nil
 }
 
 /// Respuesta de la función `messages`.

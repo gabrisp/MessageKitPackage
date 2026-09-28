@@ -165,8 +165,9 @@ final class MessagesRuntime {
 
     // MARK: Hub
 
-    /// Pide las campañas al hub. Sin `force`, solo si la caché ha caducado.
-    func refresh(force: Bool) async {
+    /// Pide las campañas al hub. Sin `force`, solo si la caché ha caducado. `open`: la campaña
+    /// de un push tocado, que el hub sirve aunque haya tope o ya se viera.
+    func refresh(force: Bool, open: String? = nil) async {
         guard let config, let client else { return }
         if !force, let fetched = state.fetchedAt, Date.now.timeIntervalSince(fetched) < min(state.ttlSeconds, 300) { return }
         // Una en marcha: sin `force` vale su resultado; con `force` se espera y se vuelve a pedir,
@@ -186,8 +187,9 @@ final class MessagesRuntime {
                     userId: uid, locale: language,
                     attributes: await attributes(),
                     capabilities: capabilities,
-                    etag: state.campaigns.isEmpty ? nil : state.etag,
-                    sdkVersion: messagesKitVersion
+                    etag: state.campaigns.isEmpty || open != nil ? nil : state.etag,
+                    sdkVersion: messagesKitVersion,
+                    open: open
                 )
                 let response = try await client.call("messages", request, as: MessagesResponse.self)
                 apply(response)
@@ -580,8 +582,8 @@ final class MessagesRuntime {
         }
         if show() { return }
         Task {
-            await refresh(force: true)
-            if !show() { MessagesLog.debug("La campaña \(campaignId) ya no le toca a este usuario") }
+            await refresh(force: true, open: campaignId)
+            if !show() { MessagesLog.error("La campaña \(campaignId) del aviso ya no está activa (o esta versión de la app no sabe pintarla)") }
         }
     }
 
