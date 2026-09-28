@@ -141,6 +141,9 @@ final class MessagesRuntime {
             Task {
                 await refreshAndPresentNew()
                 fire(.foreground)
+                // Las que no se pueden cerrar vuelven también al volver a la app, no solo al abrirla.
+                let persistent = Set(state.campaigns.filter { !$0.dismissible }.map(\.id))
+                if !persistent.isEmpty { fire(.launch, only: persistent) }
             }
         case .background:
             flushSoon(after: .zero)
@@ -332,6 +335,9 @@ final class MessagesRuntime {
     private func isEligibleLocally(_ c: Campaign, now: Date) -> Bool {
         if pending[c.id] != nil || presenter.contains(campaignId: c.id) { return false }
         if !Rules.scheduleAllows(c.schedule, now: now, userTimeZone: .current) { return false }
+        // Las que no se pueden cerrar salen cada vez hasta que el hub deja de servirlas (el usuario
+        // ya no cumple la audiencia: se ha hecho Pro, ha actualizado…). Sin frecuencia ni tope.
+        if !c.dismissible { return true }
         let history = state.history[c.id] ?? .init()
         if !Rules.frequencyAllows(c.frequency, history: history, now: now, calendar: .current) { return false }
         if state.dailyCap > 0 {
