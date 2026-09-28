@@ -62,9 +62,15 @@ public enum Messages {
     }
 
     /// Vuelve a pedir los mensajes (p. ej. tras hacerse Pro o terminar el onboarding).
-    public static func refresh() async {
+    /// Devuelve cómo ha ido (también en `Messages.lastSync`).
+    @discardableResult
+    public static func refresh() async -> SyncStatus? {
         await runtime.refresh(force: true)
+        return runtime.lastSync
     }
+
+    /// La última petición al hub: cuándo, con qué `userId`, cuántas campañas o qué error.
+    public static var lastSync: SyncStatus? { runtime.lastSync }
 
     /// Si cambia el usuario (login/logout), para que la siguiente petición use el nuevo id.
     public static func userDidChange() {

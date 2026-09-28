@@ -89,7 +89,7 @@
     "glassTintOpacity": 0.08
   },
   "dailyCap": 2,
-  "quietHoursAfterInstall": 24,
-  "quietUntilOnboarding": true,
+  "quietHoursAfterInstall": 0,
+  "quietUntilOnboarding": false,
   "publicKey": "pk_rewearly_example"
 }

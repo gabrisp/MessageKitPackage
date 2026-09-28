@@ -107,7 +107,7 @@ public struct AppConfig: Sendable, Hashable, Codable, Identifiable {
         appId: String, name: String, bundleId: String = "", languages: [String] = ["es", "en"],
         defaultLanguage: String = "es", routes: [String: Capability] = [:], customActions: [String: Capability] = [:],
         screens: [String] = [], events: [String] = [], attributes: [Attribute] = [], theme: ThemeSpec = .init(), dailyCap: Int = 2,
-        quietHoursAfterInstall: Double = 24, quietUntilOnboarding: Bool = true, publicKey: String = AppConfig.newPublicKey(),
+        quietHoursAfterInstall: Double = 0, quietUntilOnboarding: Bool = false, publicKey: String = AppConfig.newPublicKey(),
         posthogURL: String? = nil
     ) {
         self.appId = appId; self.name = name; self.bundleId = bundleId; self.languages = languages
@@ -135,8 +135,8 @@ public struct AppConfig: Sendable, Hashable, Codable, Identifiable {
         attributes = c.value(.attributes, default: [])
         theme = c.value(.theme, default: .init())
         dailyCap = c.value(.dailyCap, default: 2)
-        quietHoursAfterInstall = c.value(.quietHoursAfterInstall, default: 24)
-        quietUntilOnboarding = c.value(.quietUntilOnboarding, default: true)
+        quietHoursAfterInstall = c.value(.quietHoursAfterInstall, default: 0)
+        quietUntilOnboarding = c.value(.quietUntilOnboarding, default: false)
         publicKey = c.value(.publicKey, default: "")
         posthogURL = c.optional(.posthogURL)
     }

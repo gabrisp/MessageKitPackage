@@ -6,12 +6,17 @@ public struct MessagesDebugView: View {
     @State private var json = ""
     @State private var error: String?
     @State private var campaigns: [Campaign] = []
+    @State private var sync: SyncStatus?
 
     public init() {}
 
     public var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
+                section(L.string("Hub", "Hub")) {
+                    SyncStatusView(status: sync)
+                        .padding(16)
+                }
                 section(L.string("Para el admin", "For the admin")) {
                     VStack(alignment: .leading, spacing: 10) {
                         Text(L.string("Copia el tema, las rutas, acciones, pantallas, eventos y atributos que usa esta app, y pégalo en el admin: Apps → Importar desde la app.",
@@ -65,9 +70,12 @@ public struct MessagesDebugView: View {
             }
             .padding(20)
         }
-        .task { campaigns = Messages.cachedCampaigns }
+        .task {
+            campaigns = Messages.cachedCampaigns
+            sync = Messages.lastSync
+        }
         .refreshable {
-            await Messages.refresh()
+            sync = await Messages.refresh()
             campaigns = Messages.cachedCampaigns
         }
     }
@@ -113,5 +121,42 @@ struct RowPressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(configuration.isPressed ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear))
+    }
+}
+
+/// La última petición al hub, en claro.
+struct SyncStatusView: View {
+    let status: SyncStatus?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let s = status {
+                Label(s.ok ? L.string("Última petición correcta", "Last request OK") : L.string("La última petición falló", "The last request failed"),
+                      systemImage: s.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(s.ok ? .green : .orange)
+                Group {
+                    Text(s.date, style: .relative) + Text(L.string(" · \(s.duration.formatted(.units(allowed: [.seconds, .milliseconds], width: .narrow)))", " · \(s.duration.formatted(.units(allowed: [.seconds, .milliseconds], width: .narrow)))"))
+                    Text("userId: \(s.userId)").textSelection(.enabled)
+                    if let error = s.error {
+                        Text(error).foregroundStyle(.orange).textSelection(.enabled)
+                    } else {
+                        Text(L.string("\(s.campaigns) campañas para este usuario\(s.notModified ? " (sin cambios)" : "")",
+                                      "\(s.campaigns) campaigns for this user\(s.notModified ? " (unchanged)" : "")"))
+                        if s.campaigns == 0 {
+                            Text(L.string("Si esperabas alguna: ¿está publicada, es para esta app, y si va a usuarios concretos, está este userId?",
+                                          "If you expected one: is it published, for this app, and if it targets specific users, is this userId there?"))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .font(.footnote.monospaced())
+            } else {
+                Text(L.string("Todavía no se ha pedido nada al hub. Desliza hacia abajo para pedir ahora.", "Nothing requested from the hub yet. Pull down to request now."))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

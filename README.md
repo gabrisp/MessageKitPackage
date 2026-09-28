@@ -122,7 +122,7 @@ En el target: *Signing & Capabilities* → **Push Notifications** y **Background
 
 ### Depuración
 
-`MessagesDebugView()` enseña las campañas que el hub le ha servido a este usuario (y deja forzar una), los ejemplos en modo prueba, el botón para copiar la configuración, un campo para pegar un JSON y un botón para borrar el estado local. Con `debugLogging: true` en la configuración, el paquete apunta en consola lo que decide.
+`Messages.lastSync` (o lo que devuelve `await Messages.refresh()`) dice cuándo fue la última petición al hub, con qué `userId`, cuántas campañas le tocan a este usuario o qué error hubo. `MessagesDebugView()` lo enseña arriba del todo, y además enseña las campañas que el hub le ha servido a este usuario (y deja forzar una), los ejemplos en modo prueba, el botón para copiar la configuración, un campo para pegar un JSON y un botón para borrar el estado local. Con `debugLogging: true` en la configuración, el paquete apunta en consola lo que decide.
 
 ## Cómo decide
 

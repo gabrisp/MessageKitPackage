@@ -1,6 +1,20 @@
 import SwiftUI
 import UserNotifications
 
+/// La última petición al hub, para ver qué está pasando (en `MessagesDebugView` o en tu propia pantalla).
+public struct SyncStatus: Sendable, Hashable {
+    public var date: Date
+    /// El `userId` con el que se pidió: tiene que coincidir con el de las audiencias por usuario.
+    public var userId: String
+    public var ok: Bool
+    /// Campañas que el hub le sirve a este usuario ahora (sin contar las forzadas).
+    public var campaigns: Int
+    public var notModified: Bool
+    /// El error, si falló.
+    public var error: String?
+    public var duration: Duration
+}
+
 /// Qué ha hecho saltar una evaluación de campañas.
 enum TriggerFire: Sendable, Hashable {
     case launch
@@ -46,6 +60,8 @@ final class MessagesRuntime {
     private var flushTask: Task<Void, Never>?
     private var saveTask: Task<Void, Never>?
     private var cachedUserId: String?
+    /// La última petición al hub.
+    private(set) var lastSync: SyncStatus?
     /// Campaña de la última acción (para apuntar el resultado de una compra).
     private var lastActionCampaignId: String?
 
@@ -126,10 +142,12 @@ final class MessagesRuntime {
         if !force, let fetched = state.fetchedAt, Date.now.timeIntervalSince(fetched) < min(state.ttlSeconds, 300) { return }
         if let running = refreshTask { await running.value; return }
         let task = Task {
+            let started = ContinuousClock.now
+            let uid = await userId()
             do {
                 let request = MessagesRequest(
                     appId: config.appId, publicKey: config.publicKey,
-                    userId: await userId(), locale: language,
+                    userId: uid, locale: language,
                     attributes: await attributes(),
                     capabilities: Capabilities(routes: routes.keys.sorted(), actions: customActions.keys.sorted()),
                     etag: state.campaigns.isEmpty ? nil : state.etag,
@@ -137,7 +155,12 @@ final class MessagesRuntime {
                 )
                 let response = try await client.call("messages", request, as: MessagesResponse.self)
                 apply(response)
+                lastSync = SyncStatus(date: .now, userId: uid, ok: true, campaigns: state.campaigns.count,
+                                      notModified: response.notModified, error: nil, duration: ContinuousClock.now - started)
+                MessagesLog.debug("Hub OK: \(state.campaigns.count) campañas para \(uid)")
             } catch {
+                lastSync = SyncStatus(date: .now, userId: uid, ok: false, campaigns: state.campaigns.count,
+                                      notModified: false, error: error.localizedDescription, duration: ContinuousClock.now - started)
                 MessagesLog.error("No se pudieron pedir los mensajes: \(error.localizedDescription)")
             }
         }
