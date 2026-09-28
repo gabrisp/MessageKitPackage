@@ -3,12 +3,12 @@ import SwiftUI
 /// La API de MessagesKit.
 ///
 /// ```swift
-/// Messages.configure(.init(appId: "rewearly", endpoint: …, projectId: "remote-hub", publicKey: "…",
-///                          userId: { await identity.id() }, theme: .rewearly))
+/// Messages.configure(.init(appId: "myapp", endpoint: …, projectId: "your-project-id", publicKey: "…",
+///                          userId: { await identity.id() }, theme: .myApp))
 /// Messages.register(route: "paywall") { params in router.showPaywall() }
 /// RootView().messagesLayer()
-/// ClosetScreen().messagePlacement("closet")
-/// Messages.event("tryon_succeeded")
+/// HomeScreen().messagePlacement("home")
+/// Messages.event("task_completed")
 /// ```
 @MainActor
 public enum Messages {

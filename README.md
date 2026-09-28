@@ -37,23 +37,23 @@ Messages.configure(.init(
     endpoint: URL(string: "http://api-endpoint.com")!,
     projectId: "your-project-id",
     publicKey: "pk_…",                               // la de la app en el admin → Apps
-    userId: { await identity.id() },                 // el mismo id de RevenueCat y PostHog
-    attributes: { ["isPro": gate.isPro, "garmentCount": closet.count, "onboardingCompleted": onboarding.done] },
+    userId: { await identity.id() },                 // el mismo id que usas en suscripciones y analítica
+    attributes: { ["isPro": store.isPro, "itemCount": items.count, "onboardingCompleted": onboarding.done] },
     theme: .myApp,
     analytics: { name, props in Analytics.track(name, props) }
 ))
 
 // Lo que la app sabe abrir por nombre (acción `route`) y sus acciones propias (`custom`).
 Messages.register(route: "paywall") { params in router.showPaywall(source: params["source"]) }
-Messages.register(route: "editWorkout") { params in router.edit(id: params["id"]) }
-Messages.register(action: "claimGift") { payload in gifts.claim(payload["kind"]?.stringValue) }
+Messages.register(route: "editItem") { params in router.edit(id: params["id"]) }
+Messages.register(action: "claimReward") { payload in rewards.claim(payload["kind"]?.stringValue) }
 
 // Una vez, en la raíz:
 RootView().messagesLayer()
 
 // Disparadores:
-ClosetScreen().messagePlacement("closet")      // pantalla
-Messages.event("tryon_succeeded")              // evento (o reenvía aquí los de tu wrapper de analítica)
+HomeScreen().messagePlacement("home")          // pantalla
+Messages.event("task_completed")               // evento (o reenvía aquí los de tu wrapper de analítica)
 Messages.suppress(true)                        // durante el onboarding o una compra; false al acabar
 await Messages.refresh()                       // p. ej. al hacerse Pro
 Messages.userDidChange()                       // si cambia el id del usuario
@@ -61,7 +61,7 @@ Messages.userDidChange()                       // si cambia el id del usuario
 
 ### Atributos
 
-Cada app manda los suyos en `attributes`: los que quiera, con el nombre que quiera (`garmentCount`, `followers`, `isCreator`…). El hub no tiene un esquema fijo y evalúa las reglas contra lo que mande cada app. Además van de serie: `language`, `locale`, `country`, `appVersion`, `build`, `platform`, `osVersion`, `installDate`, `daysSinceInstall`, `pushAuthorized` y `timezone`.
+Cada app manda los suyos en `attributes`: los que quiera, con el nombre que quiera (`itemCount`, `followers`, `isCreator`…). El hub no tiene un esquema fijo y evalúa las reglas contra lo que mande cada app. Además van de serie: `language`, `locale`, `country`, `appVersion`, `build`, `platform`, `osVersion`, `installDate`, `daysSinceInstall`, `pushAuthorized` y `timezone`.
 
 ### Pasar la configuración de la app al admin
 
