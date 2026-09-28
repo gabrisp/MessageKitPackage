@@ -16,16 +16,21 @@ public struct AppReport: Sendable, Hashable, Codable {
     public var events: [String]
     /// Atributos propios (sin los de serie), con el tipo deducido de su valor actual.
     public var attributes: [AppConfig.Attribute]
+    /// Parámetros de cada ruta y acción propia, tal como los registra la app.
+    public var routeParams: [String: [AppConfig.Param]]
+    public var actionParams: [String: [AppConfig.Param]]
     public var sdkVersion: String
 
     public init(
         appId: String, bundleId: String, name: String, languages: [String], theme: ThemeSpec,
         routes: [String], actions: [String], screens: [String], events: [String],
-        attributes: [AppConfig.Attribute], sdkVersion: String
+        attributes: [AppConfig.Attribute], routeParams: [String: [AppConfig.Param]] = [:],
+        actionParams: [String: [AppConfig.Param]] = [:], sdkVersion: String
     ) {
         self.appId = appId; self.bundleId = bundleId; self.name = name; self.languages = languages
         self.theme = theme; self.routes = routes; self.actions = actions; self.screens = screens
         self.events = events; self.attributes = attributes; self.sdkVersion = sdkVersion
+        self.routeParams = routeParams; self.actionParams = actionParams
     }
 
     /// Tolerante: lo que falte se queda vacío (y el tema, el de por defecto).
@@ -42,6 +47,8 @@ public struct AppReport: Sendable, Hashable, Codable {
         screens = c.value(.screens, default: [])
         events = c.value(.events, default: [])
         attributes = c.value(.attributes, default: [])
+        routeParams = c.value(.routeParams, default: [:])
+        actionParams = c.value(.actionParams, default: [:])
         sdkVersion = c.value(.sdkVersion, default: "")
     }
 
@@ -91,8 +98,8 @@ public struct AppReport: Sendable, Hashable, Codable {
         if out.bundleId.isEmpty { out.bundleId = r.bundleId }
         if out.name.isEmpty || out.name == out.appId { out.name = r.name.isEmpty ? out.appId : r.name }
         for l in r.languages where !out.languages.contains(l) { out.languages.append(l) }
-        for route in r.routes where out.routes[route] == nil { out.routes[route] = .init() }
-        for a in r.actions where out.customActions[a] == nil { out.customActions[a] = .init() }
+        for route in r.routes { out.routes[route] = Self.merge(out.routes[route], r.routeParams[route] ?? []) }
+        for a in r.actions { out.customActions[a] = Self.merge(out.customActions[a], r.actionParams[a] ?? []) }
         out.screens = Array(Set(out.screens).union(r.screens)).sorted()
         out.events = Array(Set(out.events).union(r.events)).sorted()
         for attr in r.attributes where !out.attributes.contains(where: { $0.name == attr.name }) {
@@ -100,6 +107,19 @@ public struct AppReport: Sendable, Hashable, Codable {
         }
         out.theme = r.theme
         return out
+    }
+
+    /// Una ruta o acción: la del admin (con sus descripciones) más los parámetros que declara la app.
+    static func merge(_ existing: AppConfig.Capability?, _ declared: [AppConfig.Param]) -> AppConfig.Capability {
+        var cap = existing ?? .init()
+        for p in declared {
+            if let i = cap.params.firstIndex(where: { $0.name == p.name }) {
+                cap.params[i] = cap.params[i].filled(from: p)
+            } else {
+                cap.params.append(p)
+            }
+        }
+        return cap
     }
 
     /// Una app nueva del admin a partir del informe.

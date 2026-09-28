@@ -28,9 +28,30 @@ public enum Messages {
         runtime.routes[name] = handler
     }
 
+    /// Igual, declarando sus parámetros: el admin (tras «Copiar config del admin») enseña el
+    /// control adecuado para cada uno y avisa si falta uno obligatorio.
+    ///
+    /// ```swift
+    /// Messages.register(route: "editWorkout", params: [
+    ///     .init("id", required: true, description: "Id del entreno"),
+    ///     .init("tab", options: ["info", "series", "notas"]),
+    ///     .init("autoplay", kind: .bool),
+    /// ]) { params in router.edit(id: params["id"], tab: params["tab"]) }
+    /// ```
+    public static func register(route name: String, params: [AppConfig.Param], _ handler: @escaping @MainActor (RouteParams) -> Void) {
+        runtime.routes[name] = handler
+        runtime.routeParams[name] = params
+    }
+
     /// Una acción propia (acción `custom`).
     public static func register(action name: String, _ handler: @escaping @MainActor (JSONValue) -> Void) {
         runtime.customActions[name] = handler
+    }
+
+    /// Igual, declarando los campos de su `payload` (el admin los enseña como formulario).
+    public static func register(action name: String, params: [AppConfig.Param], _ handler: @escaping @MainActor (JSONValue) -> Void) {
+        runtime.customActions[name] = handler
+        runtime.actionParams[name] = params
     }
 
     /// Cómo compra la app (acción `purchase`). Con RevenueCat:

@@ -45,6 +45,9 @@ final class MessagesRuntime {
     var routes: [String: @MainActor (RouteParams) -> Void] = [:]
     var customActions: [String: @MainActor (JSONValue) -> Void] = [:]
     var purchaseHandler: (@MainActor (PurchaseRequest) async throws -> PurchaseOutcome)?
+    /// Parámetros declarados al registrar (para el informe del admin).
+    var routeParams: [String: [AppConfig.Param]] = [:]
+    var actionParams: [String: [AppConfig.Param]] = [:]
 
     private let sessionStart = Date()
     private var activeScreens: [String: Int] = [:]
@@ -542,6 +545,8 @@ final class MessagesRuntime {
             screens: state.seenScreens.sorted(),
             events: state.seenEvents.sorted(),
             attributes: custom.keys.sorted().map { .init(name: $0, kind: .inferred(from: custom[$0]!)) },
+            routeParams: routeParams,
+            actionParams: actionParams,
             sdkVersion: messagesKitVersion
         )
     }

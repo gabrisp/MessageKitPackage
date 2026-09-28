@@ -43,10 +43,20 @@ Messages.configure(.init(
     analytics: { name, props in Analytics.track(name, props) }
 ))
 
-// Lo que la app sabe abrir por nombre (acción `route`) y sus acciones propias (`custom`).
-Messages.register(route: "paywall") { params in router.showPaywall(source: params["source"]) }
-Messages.register(route: "editItem") { params in router.edit(id: params["id"]) }
-Messages.register(action: "claimReward") { payload in rewards.claim(payload["kind"]?.stringValue) }
+// Lo que la app sabe abrir por nombre (acción `route`) y sus acciones propias (`custom`),
+// con sus parámetros: el admin enseña el control adecuado para cada uno.
+Messages.register(route: "paywall", params: [
+    .init("source"),
+    .init("plan", options: ["monthly", "yearly"]),
+]) { params in router.showPaywall(source: params["source"]) }
+Messages.register(route: "editItem", params: [
+    .init("id", required: true, description: "Id del elemento"),
+    .init("tab", options: ["info", "history"]),
+    .init("autoplay", kind: .bool),
+]) { params in router.edit(id: params["id"], tab: params["tab"]) }
+Messages.register(action: "claimReward", params: [.init("kind", required: true, options: ["tryon", "credits"])]) { payload in
+    rewards.claim(payload["kind"]?.stringValue)
+}
 
 // Una vez, en la raíz:
 RootView().messagesLayer()
@@ -87,7 +97,7 @@ Para que el admin conozca el tema, las rutas, acciones, pantallas, eventos y atr
 CopyAdminConfigButton()   // o: let json = await Messages.appReport()
 ```
 
-Copia un JSON; en el admin: **Apps → botón de pegar**. Crea la app si no existe, o le añade lo que falte y le pone el tema de la app si ya existía, sin tocar lo que ya hubieras escrito. Las pantallas y eventos salen en cuanto la app los ha visto al menos una vez. No se manda nada al hub por su cuenta.
+Copia un JSON, que incluye los parámetros declarados de cada ruta y acción (tipo, obligatorios, valores permitidos). En el admin: **Apps → botón de pegar**. Crea la app si no existe, o le añade lo que falte y le pone el tema de la app si ya existía, sin tocar lo que ya hubieras escrito. Las pantallas y eventos salen en cuanto la app los ha visto al menos una vez. No se manda nada al hub por su cuenta.
 
 ### Pushes y avisos de cambios
 

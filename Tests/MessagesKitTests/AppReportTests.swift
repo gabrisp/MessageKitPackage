@@ -95,4 +95,33 @@ struct AppReportTests {
         #expect(spec.fontDesign == .rounded)
         #expect(spec.cardRadius == 34)
     }
+
+    @Test("Parámetros declarados por la app: tipo, mezcla y validación")
+    func declaredParams() throws {
+        let tab = AppConfig.Param("tab", options: ["info", "series"])
+        #expect(tab.kind == .options)
+        let decoded = try JSONDecoder.messages.decode(AppConfig.Param.self, from: Data(#"{ "name": "tab", "options": ["a"] }"#.utf8))
+        #expect(decoded.kind == .options)
+
+        var r = report()
+        r.routeParams = ["editItem": [.init("id", required: true), tab, .init("autoplay", kind: .bool)]]
+        var existing = AppConfig(appId: "myapp", name: "My App")
+        existing.routes = ["editItem": .init(description: "Editar", params: [.init("id", description: "Id del elemento")])]
+        let merged = r.merged(into: existing)
+        let params = try #require(merged.routes["editItem"]?.params)
+        #expect(params.map(\.name) == ["id", "tab", "autoplay"])
+        #expect(params[0].required && params[0].description == "Id del elemento", "No pisa la descripción, sí marca obligatorio")
+        #expect(merged.routes["editItem"]?.description == "Editar")
+
+        func issues(_ p: RouteParams) -> [ValidationIssue] {
+            let c = Campaign(name: "x", appIds: ["myapp"], content: ["es": [
+                Block(.heading(.init(text: "Hola"))),
+                Block(.button(.init(title: "Ir", action: .route("editItem", p)))),
+            ]])
+            return CampaignValidator.validate(c, apps: [merged])
+        }
+        #expect(issues([:]).contains { $0.severity == .error && $0.message.contains("id") })
+        #expect(!issues(["id": "42"]).contains { $0.severity == .error })
+        #expect(issues(["id": "42", "tab": "otra"]).contains { $0.severity == .warning && $0.message.contains("tab") })
+    }
 }

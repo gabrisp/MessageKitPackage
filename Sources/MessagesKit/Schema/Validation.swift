@@ -63,6 +63,21 @@ public enum CampaignValidator {
         // Acciones que las apps soportan.
         let (routes, actions) = c.requiredCapabilities
         for app in apps where c.appIds.contains(app.appId) {
+            for a in c.allActions {
+                let (declared, values, what): ([AppConfig.Param], [String: String], String) = switch a.kind {
+                case .route(let name, let params): (app.routes[name]?.params ?? [], params, L.string("la ruta «\(name)»", "the route “\(name)”"))
+                case .custom(let name, let payload): (app.customActions[name]?.params ?? [], payload.objectValue?.compactMapValues(\.stringValue) ?? [:], L.string("la acción «\(name)»", "the action “\(name)”"))
+                default: ([], [:], "")
+                }
+                for p in declared {
+                    let v = values[p.name] ?? ""
+                    if p.required, v.isEmpty {
+                        error(L.string("Falta «\(p.name)» en \(what) (obligatorio en \(app.name)).", "“\(p.name)” is missing in \(what) (required in \(app.name))."))
+                    } else if p.kind == .options, !v.isEmpty, !p.options.contains(v) {
+                        warning(L.string("«\(v)» no es un valor de «\(p.name)» en \(app.name) (\(p.options.joined(separator: ", "))).", "“\(v)” isn't a value of “\(p.name)” in \(app.name) (\(p.options.joined(separator: ", ")))."))
+                    }
+                }
+            }
             for r in routes.sorted() where app.routes[r] == nil {
                 error(L.string("\(app.name) no declara la ruta «\(r)».", "\(app.name) doesn't declare the route “\(r)”."))
             }

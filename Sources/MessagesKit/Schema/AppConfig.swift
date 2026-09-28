@@ -2,21 +2,58 @@ import Foundation
 
 /// Una app registrada en el hub: qué rutas y acciones sabe hacer, idiomas y su tema.
 public struct AppConfig: Sendable, Hashable, Codable, Identifiable {
+    /// Un parámetro de una ruta o de una acción propia. La app los declara al registrarlas
+    /// (`Messages.register(route:params:)`) y el admin enseña el control adecuado para cada uno.
     public struct Param: Sendable, Hashable, Codable, Identifiable {
+        public enum Kind: String, Sendable, Hashable, Codable, CaseIterable {
+            /// Texto libre.
+            case string
+            /// Número.
+            case number
+            /// Sí/No (llega como "true" / "false").
+            case bool
+            /// Uno de `options`.
+            case options
+        }
+
         public var name: String
+        public var kind: Kind
         public var required: Bool
+        /// Valores permitidos (solo `options`).
+        public var options: [String]
         public var description: String?
         public var id: String { name }
 
-        public init(name: String, required: Bool = false, description: String? = nil) {
-            self.name = name; self.required = required; self.description = description
+        public init(name: String, kind: Kind = .string, required: Bool = false, options: [String] = [], description: String? = nil) {
+            self.name = name
+            self.kind = options.isEmpty ? kind : .options
+            self.required = required
+            self.options = options
+            self.description = description
+        }
+
+        /// `.init("id", required: true)`, `.init("tab", options: ["info", "series"])`, `.init("autoplay", kind: .bool)`.
+        public init(_ name: String, kind: Kind = .string, required: Bool = false, options: [String] = [], description: String? = nil) {
+            self.init(name: name, kind: kind, required: required, options: options, description: description)
         }
 
         public init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             name = try c.decode(String.self, forKey: .name)
+            options = c.value(.options, default: [])
+            kind = options.isEmpty ? c.value(.kind, default: .string) : .options
             required = c.value(.required, default: false)
             description = c.optional(.description)
+        }
+
+        /// Completa lo que falte con lo que declara la app (tipo, valores, obligatorio), sin
+        /// pisar la descripción que se haya escrito en el admin.
+        func filled(from other: Param) -> Param {
+            var out = self
+            if out.kind == .string && out.options.isEmpty { out.kind = other.kind; out.options = other.options }
+            if !out.required { out.required = other.required }
+            if out.description == nil { out.description = other.description }
+            return out
         }
     }
 
