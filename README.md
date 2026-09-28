@@ -1,16 +1,15 @@
 # MessagesKit
 
-Mensajes a los usuarios de tus apps (ya publicadas en el App Store) que se crean y cambian desde el servidor, sin sacar una versión nueva cada vez: alerts de cristal, banners, toasts, sheets construidos con bloques desde el servidor y pantalla completa, con acciones, disparadores, frecuencia e impresiones. Habla con el hub de Appwrite (`remote-hub`) por REST. No tiene dependencias.
+Mensajes a los usuarios de tus apps (ya publicadas en el App Store) que se crean y cambian desde el servidor, sin sacar una versión nueva cada vez: alerts de cristal, banners, toasts, sheets construidos con bloques y pantalla completa, con acciones, disparadores, audiencia, frecuencia, impresiones y pushes.
 
-- iOS 26+ (y macOS 26+ para el admin). Swift 6.
-- Liquid Glass nativo: el alert y el banner son `.glassEffect`, los botones `.glass`/`.glassProminent`, y todo va agrupado en `GlassEffectContainer`.
-- El hub decide **a quién** y **cuántas veces**. La app decide **en qué momento** (disparadores).
+- iOS 26+ (y macOS 26+ para el admin). Swift 6. Sin dependencias.
+- Liquid Glass nativo: `.glassEffect`, `.glass`/`.glassProminent`, `GlassEffectContainer`.
+- Habla por REST con un hub de Appwrite (funciones `messages`, `events` y `devices`). **La app no lleva ninguna API key**: solo el `appId` y la clave pública de la app, que no es secreta.
+- El hub decide **a quién** y **cuántas veces**; la app, **en qué momento** (disparadores).
 
 ## Instalación
 
 Xcode → *File* → *Add Package Dependencies…* → `https://github.com/gabrisp/MessageKitPackage.git` → producto **MessagesKit**.
-
-O en un `Package.swift`:
 
 ```swift
 .package(url: "https://github.com/gabrisp/MessageKitPackage.git", branch: "main"),
@@ -18,15 +17,13 @@ O en un `Package.swift`:
 .product(name: "MessagesKit", package: "MessageKitPackage"),
 ```
 
-Mientras se desarrolla junto al hub y al admin, también vale como dependencia local (*Add Local…*).
-
-## Integración (ReWearly de ejemplo)
+## Integración
 
 ```swift
 import MessagesKit
 
 extension MessagesTheme {
-    static let rewearly = MessagesTheme(
+    static let myApp = MessagesTheme(
         colors: ["accent": .purple, "background": Color("Background")],
         fontDesign: .rounded,
         cardRadius: 34,
@@ -34,19 +31,19 @@ extension MessagesTheme {
     )
 }
 
-// Al arrancar (App.init o el primer .task):
+// Al arrancar:
 Messages.configure(.init(
-    appId: "rewearly",
+    appId: "myapp",
     endpoint: URL(string: "http://api-endpoint.com")!,
-    projectId: "remote-hub",
+    projectId: "your-project-id",
     publicKey: "pk_…",                               // la de la app en el admin → Apps
     userId: { await identity.id() },                 // el mismo id de RevenueCat y PostHog
     attributes: { ["isPro": gate.isPro, "garmentCount": closet.count, "onboardingCompleted": onboarding.done] },
-    theme: .rewearly,
+    theme: .myApp,
     analytics: { name, props in Analytics.track(name, props) }
 ))
 
-// Lo que la app sabe abrir por nombre (acción `route`). Tiene que coincidir con lo declarado en el admin.
+// Lo que la app sabe abrir por nombre (acción `route`) y sus acciones propias (`custom`).
 Messages.register(route: "paywall") { params in router.showPaywall(source: params["source"]) }
 Messages.register(route: "editWorkout") { params in router.edit(id: params["id"]) }
 Messages.register(action: "claimGift") { payload in gifts.claim(payload["kind"]?.stringValue) }
@@ -61,6 +58,20 @@ Messages.suppress(true)                        // durante el onboarding o una co
 await Messages.refresh()                       // p. ej. al hacerse Pro
 Messages.userDidChange()                       // si cambia el id del usuario
 ```
+
+### Atributos
+
+Cada app manda los suyos en `attributes`: los que quiera, con el nombre que quiera (`garmentCount`, `followers`, `isCreator`…). El hub no tiene un esquema fijo y evalúa las reglas contra lo que mande cada app. Además van de serie: `language`, `locale`, `country`, `appVersion`, `build`, `platform`, `osVersion`, `installDate`, `daysSinceInstall`, `pushAuthorized` y `timezone`.
+
+### Pasar la configuración de la app al admin
+
+Para que el admin conozca el tema, las rutas, acciones, pantallas, eventos y atributos que usa la app (y los ofrezca en sus menús), pon este botón donde quieras, por ejemplo en unos ajustes de depuración:
+
+```swift
+CopyAdminConfigButton()   // o: let json = await Messages.appReport()
+```
+
+Copia un JSON; en el admin: **Apps → botón de pegar**. Crea la app si no existe, o le añade lo que falte y le pone el tema de la app si ya existía, sin tocar lo que ya hubieras escrito. Las pantallas y eventos salen en cuanto la app los ha visto al menos una vez. No se manda nada al hub por su cuenta.
 
 ### Pushes y avisos de cambios
 
@@ -88,25 +99,33 @@ func userNotificationCenter(_ c: UNUserNotificationCenter, didReceive r: UNNotif
 
 En el target: *Signing & Capabilities* → **Push Notifications** y **Background Modes → Remote notifications**.
 
-**Cómo se entera la app de lo nuevo sin reabrirla (y sin conexiones abiertas):** cuando se publica, pausa o edita una campaña, el hub manda un push silencioso a las apps de esa campaña. Si la app está abierta, o iOS la despierta en segundo plano, pide los mensajes; las campañas nuevas pasan por sus disparadores como si la app acabara de abrirse. Lo de "Enviar a un usuario" sale al momento si estás dentro. iOS raciona los silenciosos (unos pocos por hora), y si alguno no llega, la app lo recoge al abrir o al volver a primer plano.
-
-El permiso de avisos lo puede pedir una campaña (acción `requestPushPermission`). Si ya lo tenías, llama a `registerForRemoteNotifications()` como siempre y pásale el token a `registerDeviceToken`.
+- **Sin conexiones abiertas.** Cuando se publica, pausa o edita una campaña, el hub manda un push silencioso a esa app. Si está abierta (o iOS la despierta), pide los mensajes y lo nuevo pasa por sus disparadores como si acabara de abrirse. iOS raciona los silenciosos (unos pocos por hora); si alguno no llega, se recoge al abrir o al volver a primer plano.
+- "Enviar a un usuario" (desde el admin) sale al momento si la app está abierta.
+- El permiso de avisos lo puede pedir una campaña (acción `requestPushPermission`).
+- En el hub basta con una clave `.p8` de APNs del equipo (*Team Scoped*, *Sandbox & Production*): cada app que se da de alta en el admin tiene sus proveedores sola.
 
 ### Depuración
 
-`MessagesDebugView()` muestra las campañas que el hub le ha servido a este usuario (y deja forzar una), los ejemplos en modo prueba, un campo para pegar un JSON y un botón para borrar el estado local. Con `debugLogging: true` en la configuración se registran en consola las decisiones del paquete.
+`MessagesDebugView()` enseña las campañas que el hub le ha servido a este usuario (y deja forzar una), los ejemplos en modo prueba, el botón para copiar la configuración, un campo para pegar un JSON y un botón para borrar el estado local. Con `debugLogging: true` en la configuración, el paquete apunta en consola lo que decide.
 
 ## Cómo decide
 
-1. Al abrir, al volver a primer plano (si la caché tiene más de 5 min) y cuando el hub avisa con un push silencioso, pide las campañas al hub (función `messages`). Al abrir espera como mucho 4 s y, si no llegan, usa la caché del disco.
-2. El hub filtra por audiencia, calendario, frecuencia (mirando `impressions`), silencio tras instalar, tope diario y capacidades: solo sirve campañas cuyas rutas y acciones propias ha registrado la app.
-3. La app espera a su disparador (`launch`, `foreground`, `screen`, `event`), aplica el retraso y vuelve a comprobar la frecuencia en local (lo que acabas de ver no vuelve a salir aunque el hub tarde en enterarse).
-4. Presentador único con cola: nunca hay dos mensajes a la vez, sale antes el de mayor prioridad, y nunca aparece encima de algo que la app tenga presentado.
-5. Las impresiones (`shown`, `dismissed`, `clicked`, `push_opened`) se guardan en disco, se mandan en lotes a la función `events` y además se pasan al cierre `analytics` (`message_shown`, `message_clicked`…).
+1. Pide las campañas al hub (función `messages`) al abrir, al volver a primer plano (si hace más de 5 min) y cuando llega un push silencioso. Al abrir espera como mucho 4 s; si no, usa la caché del disco.
+2. El hub filtra por:
+   - audiencia (reglas y porcentaje)
+   - calendario
+   - frecuencia (mirando `impressions`)
+   - silencio tras instalar y tope diario
+   - capacidades: solo sirve campañas cuyas rutas y acciones propias ha registrado la app
+3. La app espera a su disparador (`launch`, `foreground`, `screen`, `event`) y aplica el retraso. Luego vuelve a comprobar la frecuencia en local, así lo que acabas de ver no vuelve a salir aunque el hub tarde en enterarse.
+4. Hay un solo presentador con cola: nunca salen dos mensajes a la vez, sale antes el de más prioridad, y nunca aparece encima de algo que la app tenga presentado. `Messages.suppress(true)` lo para del todo.
+5. Las impresiones (`shown`, `dismissed`, `clicked`, `push_opened`) se guardan en disco, se mandan en lotes a `events` y además se pasan al cierre `analytics` (`message_shown`, `message_clicked`…).
+
+**Porcentaje de audiencia.** Es un despliegue estable: cada usuario cae siempre en el mismo sitio (un hash de su id y el de la campaña). Pasar de 60 % a 80 % mantiene a los mismos 60 % y añade más, y se aplica sobre los que cumplen las reglas.
 
 ## Esquema
 
-Una campaña es JSON con `schemaVersion`. El contenido va por idioma (`content: { "es": [bloques], "en": [bloques] }`); si falta el del usuario, se usa `defaultLanguage`. Los bloques y acciones que no conoce se ignoran, no rompen. Hay un ejemplo de cada presentación en `Sources/MessagesKit/Resources/Examples/`.
+Una campaña es JSON con `schemaVersion`. El contenido va por idioma (`content: { "es": [bloques], "en": [bloques] }`); si falta el del usuario, se usa `defaultLanguage`. Los bloques y acciones que no conoce se ignoran, no rompen, y unas reglas de audiencia que no se entienden no le salen a nadie. Hay un ejemplo de cada presentación en `Sources/MessagesKit/Resources/Examples/`.
 
 | Bloque | Campos |
 |---|---|
@@ -124,20 +143,24 @@ Una campaña es JSON con `schemaVersion`. El contenido va por idioma (`content: 
 | `countdown` | `until`, `label`, `expiredText` |
 | `web` | `url` (https), `height` |
 
-Colores por token (`accent`, `primaryText`, `secondaryText`, `background`, `positive`, `warning`, `danger`, o los que definas), o hex.
+Los colores van por token (`accent`, `primaryText`, `secondaryText`, `background`, `positive`, `warning`, `danger`, o los que defina el tema) o en hex.
 
 **Acciones** (`action.type`): `dismiss`, `route` (`name`, `params`), `deepLink` (`url`), `openURL` (`url`, `inApp`), `requestReview`, `requestPushPermission`, `share` (`text`, `url`), `copy` (`text`, `toast`), `openCampaign` (`campaignId`), `track` (`event`, `properties`), `custom` (`name`, `payload`). Todas admiten `thenDismiss` y `trackAs`.
 
-**Presentación**: `type` (`alert`/`banner`/`toast`/`sheet`/`fullscreen`), `position` (banner y toast), `autoDismissSeconds`, `tapAction` y `detents` (sheet). Los detents son los del sistema (`"medium"`, `"large"`) y los propios (`"fitted"`, que mide el contenido, `{ "fraction": 0.4 }` y `{ "height": 320 }`). El primero es la altura con la que se abre.
+**Presentación**:
+- `type`: `alert`, `banner`, `toast`, `sheet` o `fullscreen`.
+- `position` (banner y toast), `autoDismissSeconds` y `tapAction`.
+- `detents` (sheet): los del sistema (`"medium"`, `"large"`) y los propios (`"fitted"`, que mide el contenido, `{ "fraction": 0.4 }` y `{ "height": 320 }`). El primero es la altura con la que se abre.
 
-Las reglas de audiencia, calendario y frecuencia están en `Schema/Rules.swift`. El hub las implementa igual en TypeScript, y `Tests/…/SharedFixtureTests.swift` comprueba que ambos lados deciden lo mismo sobre los mismos casos (`functions/shared/test/rules-cases.json`). Ese test solo corre si el paquete está junto a la carpeta `functions/` del hub; en este repo suelto se salta.
+**Audiencia**: `userIds`, `percent` y `rules` (`all`/`any` anidables con condiciones `{ attr, op, value }`). Operadores: `eq`, `neq`, `in`, `nin`, `gt`, `gte`, `lt`, `lte`, `exists` y `contains`. Las versiones (`"1.10"`) se comparan como versiones.
+
+Las reglas de audiencia, calendario y frecuencia están en `Schema/Rules.swift`. El hub las implementa igual en TypeScript, y `SharedFixtureTests` comprueba que los dos lados deciden lo mismo sobre los mismos casos (solo corre si el paquete está junto a la carpeta `functions/` del hub).
 
 ## Para el admin (vista previa)
 
-- `Messages.preview(campaign:language:variant:theme:)`: la presenta de verdad en modo prueba.
+- `Messages.preview(campaign:language:variant:theme:)`: la presenta de verdad en modo prueba; los botones dicen qué harían y no se cuenta nada.
 - `MessageInlinePreview`: la pinta dentro de un marco.
 - `MessageBlockPreview`: un bloque suelto.
-- `MessagesTheme(spec:)`: el tema desde `apps.theme`.
-- `CampaignValidator`: comprueba la campaña antes de publicar.
-- `ActionDescriber`: describe lo que haría una acción.
-- `presenter.testDestinationContent`: pinta a dónde llevaría una acción (rutas, deep links…) en modo prueba.
+- `presenter.testDestinationContent`: pinta a dónde llevaría una acción (rutas con sus parámetros, deep links, webs, acciones propias, avisos del sistema).
+- `MessagesTheme(spec:)`, `ThemeSpec(theme:)` y `AppReport`: el tema y la configuración de la app, de ida y vuelta.
+- `CampaignValidator` y `ActionDescriber`.
