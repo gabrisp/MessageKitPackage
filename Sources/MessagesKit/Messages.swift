@@ -73,6 +73,25 @@ public enum Messages {
         runtime.handleNotification(userInfo)
     }
 
+    /// Pásale los avisos silenciosos (`didReceiveRemoteNotification`). Si el hub avisa de
+    /// cambios, pide los mensajes y lo nuevo sale sin reabrir la app. `true` si era de MessagesKit.
+    @discardableResult
+    public static func didReceiveRemoteNotification(_ userInfo: [AnyHashable: Any]) async -> Bool {
+        guard MessagesRuntime.isRefreshSignal(userInfo) else { return false }
+        await runtime.refreshFromSignal()
+        return true
+    }
+
+    /// Pásale los avisos que llegan con la app abierta (`willPresent`). Si es un aviso de
+    /// MessagesKit (cambios o vista previa), refresca y devuelve `true`: no hace falta enseñar
+    /// el banner del sistema, porque el mensaje sale dentro de la app.
+    @discardableResult
+    public static func willPresentNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
+        guard MessagesRuntime.isRefreshSignal(userInfo) else { return false }
+        Task { await runtime.refreshFromSignal() }
+        return true
+    }
+
     // MARK: Vista previa y depuración
 
     /// Pinta una campaña ahora mismo en modo prueba: los botones dicen qué harían y no se

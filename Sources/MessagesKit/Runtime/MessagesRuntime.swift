@@ -187,7 +187,7 @@ final class MessagesRuntime {
         presenter.removeQueued { $0.campaign.trigger.on == .screen && $0.campaign.trigger.screen == screen && $0.mode == .live }
     }
 
-    func fire(_ trigger: TriggerFire) {
+    func fire(_ trigger: TriggerFire, only ids: Set<String>? = nil) {
         guard config != nil else { return }
         guard launchEvaluated else {
             if case .event(let e) = trigger { earlyEvents.append(e) }
@@ -195,7 +195,7 @@ final class MessagesRuntime {
         }
         let now = Date.now
         let candidates = state.campaigns
-            .filter { trigger.matches($0.trigger) }
+            .filter { trigger.matches($0.trigger) && (ids?.contains($0.id) ?? true) }
             .sorted { $0.priority > $1.priority }
         for campaign in candidates where isEligibleLocally(campaign, now: now) {
             let elapsed = now.timeIntervalSince(sessionStart)
@@ -387,14 +387,37 @@ final class MessagesRuntime {
         }
     }
 
+    /// Si un aviso es de los que solo dicen "hay cambios" (silencioso o de vista previa).
+    static func isRefreshSignal(_ userInfo: [AnyHashable: Any]) -> Bool {
+        userInfo["messageskit"] as? String == "refresh" || userInfo["preview"] != nil
+    }
+
+    /// El hub avisa de que algo ha cambiado (push silencioso, o el de "Enviar a un usuario"):
+    /// se piden los mensajes y lo nuevo pasa por sus disparadores como si la app acabara de
+    /// abrirse, sin tener que salir y volver a entrar. No hay ninguna conexión abierta.
+    func refreshFromSignal() async {
+        guard config != nil else { return }
+        let before = Set(state.campaigns.map(\.id))
+        await refresh(force: true)
+        guard launchEvaluated else { return }
+        presentForced()
+        let fresh = Set(state.campaigns.map(\.id)).subtracting(before)
+        guard !fresh.isEmpty else { return }
+        MessagesLog.debug("Aviso del hub: \(fresh.count) campañas nuevas")
+        fire(.launch, only: fresh)
+        fire(.foreground, only: fresh)
+        for screen in activeScreens.keys { fire(.screen(screen), only: fresh) }
+    }
+
     /// Lo llama la app al abrir un aviso. Devuelve `true` si era de MessagesKit.
     func handleNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
-        guard let campaignId = userInfo["campaignId"] as? String else { return false }
-        record(.pushOpened, nil, campaignId: campaignId)
-        if userInfo["preview"] != nil {
-            Task { await refresh(force: true) }
+        if Self.isRefreshSignal(userInfo) {
+            if let campaignId = userInfo["campaignId"] as? String { record(.pushOpened, nil, campaignId: campaignId) }
+            Task { await refreshFromSignal() }
             return true
         }
+        guard let campaignId = userInfo["campaignId"] as? String else { return false }
+        record(.pushOpened, nil, campaignId: campaignId)
         if let raw = userInfo["action"] as? String,
            let action = try? JSONDecoder.messages.decode(MessageAction.self, from: Data(raw.utf8)) {
             if case .openCampaign(let id) = action.kind { open(campaignId: id) } else { perform(action, from: nil) }

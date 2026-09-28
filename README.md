@@ -62,7 +62,7 @@ await Messages.refresh()                       // p. ej. al hacerse Pro
 Messages.userDidChange()                       // si cambia el id del usuario
 ```
 
-### Pushes
+### Pushes y avisos de cambios
 
 ```swift
 // AppDelegate
@@ -70,11 +70,25 @@ func application(_ app: UIApplication, didRegisterForRemoteNotificationsWithDevi
     Messages.registerDeviceToken(token)        // detecta sandbox (build de Xcode) o producción (TestFlight y App Store)
 }
 
+// Push silencioso del hub ("hay cambios"): pide los mensajes y lo nuevo sale sin reabrir la app.
+func application(_ app: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
+    await Messages.didReceiveRemoteNotification(userInfo) ? .newData : .noData
+}
+
 // UNUserNotificationCenterDelegate
+func userNotificationCenter(_ c: UNUserNotificationCenter, willPresent n: UNNotification) async -> UNNotificationPresentationOptions {
+    // Con la app abierta: si es de MessagesKit, el mensaje sale dentro y no hace falta el banner.
+    await Messages.willPresentNotification(n.request.content.userInfo) ? [] : [.banner, .sound]
+}
+
 func userNotificationCenter(_ c: UNUserNotificationCenter, didReceive r: UNNotificationResponse) async {
-    await MainActor.run { Messages.handleNotification(r.notification.request.content.userInfo) }
+    await Messages.handleNotification(r.notification.request.content.userInfo)
 }
 ```
+
+En el target: *Signing & Capabilities* → **Push Notifications** y **Background Modes → Remote notifications**.
+
+**Cómo se entera la app de lo nuevo sin reabrirla (y sin conexiones abiertas):** cuando se publica, pausa o edita una campaña, el hub manda un push silencioso a las apps de esa campaña. Si la app está abierta, o iOS la despierta en segundo plano, pide los mensajes; las campañas nuevas pasan por sus disparadores como si la app acabara de abrirse. Lo de "Enviar a un usuario" sale al momento si estás dentro. iOS raciona los silenciosos (unos pocos por hora), y si alguno no llega, la app lo recoge al abrir o al volver a primer plano.
 
 El permiso de avisos lo puede pedir una campaña (acción `requestPushPermission`). Si ya lo tenías, llama a `registerForRemoteNotifications()` como siempre y pásale el token a `registerDeviceToken`.
 
@@ -84,7 +98,7 @@ El permiso de avisos lo puede pedir una campaña (acción `requestPushPermission
 
 ## Cómo decide
 
-1. Al abrir, pide las campañas al hub (función `messages`), con un tope de 4 s. Si no llegan, usa la caché del disco.
+1. Al abrir, al volver a primer plano (si la caché tiene más de 5 min) y cuando el hub avisa con un push silencioso, pide las campañas al hub (función `messages`). Al abrir espera como mucho 4 s y, si no llegan, usa la caché del disco.
 2. El hub filtra por audiencia, calendario, frecuencia (mirando `impressions`), silencio tras instalar, tope diario y capacidades: solo sirve campañas cuyas rutas y acciones propias ha registrado la app.
 3. La app espera a su disparador (`launch`, `foreground`, `screen`, `event`), aplica el retraso y vuelve a comprobar la frecuencia en local (lo que acabas de ver no vuelve a salir aunque el hub tarde en enterarse).
 4. Presentador único con cola: nunca hay dos mensajes a la vez, sale antes el de mayor prioridad, y nunca aparece encima de algo que la app tenga presentado.
