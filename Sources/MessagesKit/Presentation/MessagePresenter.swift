@@ -202,7 +202,7 @@ public final class MessagePresenter {
         case .local:
             break
         case .test:
-            let entry = TestActionEntry(campaignName: request.campaign.name, action: action, description: ActionDescriber.describe(action, language: request.language))
+            let entry = TestActionEntry(campaignName: request.campaign.name, action: action, description: ActionDescriber.describe(action, language: request.language, messageDismissible: request.dismissible))
             testLog.insert(entry, at: 0)
             if case .dismiss = action.kind {} else { showNotice(entry) }
             if case .openCampaign(let id) = action.kind, let next = testCampaignResolver?(id) {

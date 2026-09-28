@@ -3,7 +3,7 @@ import SwiftUI
 public extension MessagePresenter {
     /// Apunta en el registro de pruebas lo que haría una acción y lo avisa en pantalla.
     func recordTestAction(_ action: MessageAction, campaign: Campaign, language: String) {
-        let entry = TestActionEntry(campaignName: campaign.name, action: action, description: ActionDescriber.describe(action, language: language))
+        let entry = TestActionEntry(campaignName: campaign.name, action: action, description: ActionDescriber.describe(action, language: language, messageDismissible: campaign.dismissible))
         testLog.insert(entry, at: 0)
         showNotice(entry)
         if case .openCampaign(let id) = action.kind, let next = testCampaignResolver?(id) {

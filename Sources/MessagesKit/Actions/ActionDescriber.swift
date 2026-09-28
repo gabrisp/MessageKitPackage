@@ -2,7 +2,9 @@ import Foundation
 
 /// Describe en una frase lo que haría una acción (modo prueba y editor).
 public enum ActionDescriber {
-    public static func describe(_ a: MessageAction, language: String? = nil) -> String {
+    /// `messageDismissible`: si el mensaje en el que está se puede cerrar (si no, los botones no lo
+    /// cierran salvo que lo digan; ver `MessageAction.closes(messageDismissible:)`).
+    public static func describe(_ a: MessageAction, language: String? = nil, messageDismissible: Bool = true) -> String {
         func t(_ es: String, _ en: String) -> String { L.string(es, en, language: language) }
         let base: String
         switch a.kind {
@@ -37,6 +39,6 @@ public enum ActionDescriber {
         case .unknown(let type, _):
             return t("Acción desconocida «\(type)»: no haría nada", "Unknown action “\(type)”: would do nothing")
         }
-        return a.dismisses ? base + t(" y cerraría", " and close") : base
+        return a.closes(messageDismissible: messageDismissible) ? base + t(" y cerraría", " and close") : base
     }
 }
