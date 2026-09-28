@@ -3,6 +3,22 @@ import Foundation
 /// Lo que se guarda en disco por app: la última respuesta del hub (para funcionar sin red),
 /// la frecuencia local y las impresiones pendientes de enviar.
 struct PersistedState: Codable, Sendable {
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        campaigns = c.value(.campaigns, default: [])
+        etag = c.optional(.etag)
+        dailyCap = c.value(.dailyCap, default: 0)
+        fetchedAt = c.optional(.fetchedAt)
+        ttlSeconds = c.value(.ttlSeconds, default: 300)
+        history = c.value(.history, default: [:])
+        pendingEvents = c.value(.pendingEvents, default: [])
+        forced = c.value(.forced, default: [])
+        seenScreens = c.value(.seenScreens, default: [])
+        seenEvents = c.value(.seenEvents, default: [])
+    }
+
     var campaigns: [Campaign] = []
     var etag: String?
     var dailyCap: Int = 0
@@ -12,6 +28,9 @@ struct PersistedState: Codable, Sendable {
     var pendingEvents: [Impression] = []
     /// Campañas forzadas ("Enviar a un usuario", push) que aún no han salido.
     var forced: [Campaign] = []
+    /// Pantallas y eventos que ha visto la app (para el informe del admin).
+    var seenScreens: Set<String> = []
+    var seenEvents: Set<String> = []
 }
 
 /// Lectura y escritura en disco fuera del hilo principal.

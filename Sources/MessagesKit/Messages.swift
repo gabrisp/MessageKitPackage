@@ -35,6 +35,7 @@ public enum Messages {
 
     /// Disparador de evento. Se puede llamar desde el wrapper de analítica para reenviarlos todos.
     public static func event(_ name: String) {
+        runtime.noteEvent(name)
         runtime.fire(.event(name))
     }
 
@@ -115,6 +116,14 @@ public enum Messages {
     /// Enseña de verdad una campaña de la caché (o la pide), saltándose disparadores.
     public static func show(campaignId: String) {
         runtime.open(campaignId: campaignId)
+    }
+
+    /// Lo que usa esta app (tema, rutas, acciones, pantallas y eventos vistos, atributos propios),
+    /// en JSON para pegarlo en el admin: Apps → Importar desde la app. `nil` sin `configure`.
+    public static func appReport() async -> String? {
+        guard let report = await runtime.appReport(),
+              let data = try? JSONEncoder.messagesPretty.encode(report) else { return nil }
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// Las campañas que el hub ha servido a este usuario (para un menú de depuración).

@@ -172,6 +172,7 @@ final class MessagesRuntime {
 
     func placementAppeared(_ screen: String) {
         activeScreens[screen, default: 0] += 1
+        if state.seenScreens.insert(screen).inserted { scheduleSave() }
         fire(.screen(screen))
     }
 
@@ -468,6 +469,31 @@ final class MessagesRuntime {
     }
 
     func invalidateUser() { cachedUserId = nil }
+
+    func noteEvent(_ name: String) {
+        if state.seenEvents.insert(name).inserted { scheduleSave() }
+    }
+
+    /// Lo que usa esta app, para pegarlo en el admin (Apps → Importar desde la app).
+    func appReport() async -> AppReport? {
+        guard let config else { return nil }
+        let builtIn = Set(AppConfig.Attribute.builtIn.map(\.name) + ["locale", "custom"])
+        let custom = await attributes().filter { !builtIn.contains($0.key) && $0.value != .null }
+        let info = Bundle.main.infoDictionary ?? [:]
+        return AppReport(
+            appId: config.appId,
+            bundleId: Bundle.main.bundleIdentifier ?? "",
+            name: info["CFBundleDisplayName"] as? String ?? info["CFBundleName"] as? String ?? config.appId,
+            languages: Bundle.main.localizations.filter { $0 != "Base" }.sorted(),
+            theme: ThemeSpec(theme: config.theme),
+            routes: routes.keys.sorted(),
+            actions: customActions.keys.sorted(),
+            screens: state.seenScreens.sorted(),
+            events: state.seenEvents.sorted(),
+            attributes: custom.keys.sorted().map { .init(name: $0, kind: .inferred(from: custom[$0]!)) },
+            sdkVersion: messagesKitVersion
+        )
+    }
 
     private func attributes() async -> [String: JSONValue] {
         var out: [String: JSONValue] = [:]

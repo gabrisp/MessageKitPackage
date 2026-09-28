@@ -12,6 +12,17 @@ public struct MessagesDebugView: View {
     public var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 24) {
+                section(L.string("Para el admin", "For the admin")) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(L.string("Copia el tema, las rutas, acciones, pantallas, eventos y atributos que usa esta app, y pégalo en el admin: Apps → Importar desde la app.",
+                                      "Copies this app's theme, routes, actions, screens, events and attributes. Paste it in the admin: Apps → Import from app."))
+                            .font(.footnote).foregroundStyle(.secondary)
+                        CopyAdminConfigButton()
+                            .frame(maxWidth: .infinity)
+                        .buttonStyle(.glassProminent)
+                    }
+                    .padding(16)
+                }
                 section(L.string("Servidas por el hub", "Served by the hub")) {
                     if campaigns.isEmpty {
                         ContentUnavailableView(L.string("Sin campañas", "No campaigns"), systemImage: "tray",
