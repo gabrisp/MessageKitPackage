@@ -59,6 +59,22 @@ await Messages.refresh()                       // p. ej. al hacerse Pro
 Messages.userDidChange()                       // si cambia el id del usuario
 ```
 
+### Compras (acción `purchase`)
+
+Un botón puede lanzar la hoja de compra de Apple. Con RevenueCat, registra una vez cómo compra la app (el paquete no depende de RevenueCat):
+
+```swift
+Messages.register(purchase: { req in
+    let offerings = try await Purchases.shared.offerings()
+    guard let offering = req.offering.flatMap({ offerings.offering(identifier: $0) }) ?? offerings.current,
+          let package = req.packageId.flatMap({ offering.package(identifier: $0) }) ?? offering.availablePackages.first
+    else { return .failed }
+    return try await Purchases.shared.purchase(package: package).userCancelled ? .cancelled : .purchased
+})
+```
+
+Sin manejador, compra el `productId` directamente con StoreKit 2. El resultado (`purchased`, `cancelled`, `pending` o `failed`) queda en impresiones y analítica. Al completarse la compra, la app vuelve a pedir los mensajes (por ejemplo, para que dejen de salir los de usuarios gratis). Las versiones antiguas del paquete no reciben campañas con compras.
+
 ### Atributos
 
 Cada app manda los suyos en `attributes`: los que quiera, con el nombre que quiera (`itemCount`, `followers`, `isCreator`…). El hub no tiene un esquema fijo y evalúa las reglas contra lo que mande cada app. Además van de serie: `language`, `locale`, `country`, `appVersion`, `build`, `platform`, `osVersion`, `installDate`, `daysSinceInstall`, `pushAuthorized` y `timezone`.
@@ -145,7 +161,7 @@ Una campaña es JSON con `schemaVersion`. El contenido va por idioma (`content: 
 
 Los colores van por token (`accent`, `primaryText`, `secondaryText`, `background`, `positive`, `warning`, `danger`, o los que defina el tema) o en hex.
 
-**Acciones** (`action.type`): `dismiss`, `route` (`name`, `params`), `deepLink` (`url`), `openURL` (`url`, `inApp`), `requestReview`, `requestPushPermission`, `share` (`text`, `url`), `copy` (`text`, `toast`), `openCampaign` (`campaignId`), `track` (`event`, `properties`), `custom` (`name`, `payload`). Todas admiten `thenDismiss` y `trackAs`.
+**Acciones** (`action.type`): `dismiss`, `route` (`name`, `params`), `deepLink` (`url`), `openURL` (`url`, `inApp`), `requestReview`, `requestPushPermission`, `share` (`text`, `url`), `copy` (`text`, `toast`), `openCampaign` (`campaignId`), `track` (`event`, `properties`), `custom` (`name`, `payload`), `purchase` (`offering`, `package`, `productId`). Todas admiten `thenDismiss` y `trackAs`.
 
 **Presentación**:
 - `type`: `alert`, `banner`, `toast`, `sheet` o `fullscreen`.

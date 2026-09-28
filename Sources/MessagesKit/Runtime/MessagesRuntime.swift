@@ -30,6 +30,7 @@ final class MessagesRuntime {
 
     var routes: [String: @MainActor (RouteParams) -> Void] = [:]
     var customActions: [String: @MainActor (JSONValue) -> Void] = [:]
+    var purchaseHandler: (@MainActor (PurchaseRequest) async throws -> PurchaseOutcome)?
 
     private let sessionStart = Date()
     private var activeScreens: [String: Int] = [:]
@@ -45,6 +46,8 @@ final class MessagesRuntime {
     private var flushTask: Task<Void, Never>?
     private var saveTask: Task<Void, Never>?
     private var cachedUserId: String?
+    /// Campaña de la última acción (para apuntar el resultado de una compra).
+    private var lastActionCampaignId: String?
 
     init(presenter: MessagePresenter) {
         self.presenter = presenter
@@ -254,6 +257,7 @@ final class MessagesRuntime {
             state.history[r.campaign.id, default: .init()].actedAt = .now
             record(.clicked, r, actionId: action.trackingId)
         }
+        lastActionCampaignId = r.campaign.id
         perform(action, from: r)
     }
 
@@ -329,6 +333,23 @@ final class MessagesRuntime {
             if let handler = routes[name] { handler(params) } else { MessagesLog.error("Ruta no registrada: \(name)") }
         case .custom(let name, let payload):
             if let handler = customActions[name] { handler(payload) } else { MessagesLog.error("Acción no registrada: \(name)") }
+        case .purchase(let productId, let offering, let packageId):
+            let request = PurchaseRequest(productId: productId, offering: offering, packageId: packageId)
+            Task {
+                let outcome: PurchaseOutcome
+                if let purchaseHandler {
+                    do { outcome = try await purchaseHandler(request) } catch {
+                        MessagesLog.error("Compra fallida: \(error.localizedDescription)")
+                        outcome = .failed
+                    }
+                } else if let productId, !productId.isEmpty {
+                    outcome = await StoreKitPurchase.buy(productId: productId)
+                } else {
+                    MessagesLog.error("Compra sin producto y sin Messages.register(purchase:)")
+                    outcome = .failed
+                }
+                purchaseFinished(outcome, action: action)
+            }
         case .deepLink(let url):
             if let u = URL(string: url) { presenter.system.openURL?(u) }
         case .openURL(let url, let inApp):
@@ -366,6 +387,13 @@ final class MessagesRuntime {
         case .track(let event, let properties):
             config?.analytics?(event, properties.mapValues { $0.anySendable })
         }
+    }
+
+    /// El resultado de la compra también queda en impresiones y analítica.
+    private func purchaseFinished(_ outcome: PurchaseOutcome, action: MessageAction) {
+        guard let campaignId = lastActionCampaignId else { return }
+        record(.action, nil, campaignId: campaignId, actionId: "\(action.trackingId):\(outcome.rawValue)")
+        if outcome == .purchased { Task { await refresh(force: true) } }
     }
 
     // MARK: Push

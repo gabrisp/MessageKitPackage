@@ -81,7 +81,7 @@ public struct TestDestination: Identifiable, Sendable {
     /// Acciones que llevan a algún sitio (el resto solo se registran).
     static func navigates(_ action: MessageAction) -> Bool {
         switch action.kind {
-        case .route, .deepLink, .openURL, .custom, .requestReview, .requestPushPermission, .share: true
+        case .route, .deepLink, .openURL, .custom, .requestReview, .requestPushPermission, .share, .purchase: true
         default: false
         }
     }

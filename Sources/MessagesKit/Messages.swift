@@ -33,6 +33,23 @@ public enum Messages {
         runtime.customActions[name] = handler
     }
 
+    /// Cómo compra la app (acción `purchase`). Con RevenueCat:
+    ///
+    /// ```swift
+    /// Messages.register(purchase: { req in
+    ///     let offerings = try await Purchases.shared.offerings()
+    ///     guard let offering = req.offering.flatMap({ offerings.offering(identifier: $0) }) ?? offerings.current,
+    ///           let package = req.packageId.flatMap({ offering.package(identifier: $0) }) ?? offering.availablePackages.first
+    ///     else { return .failed }
+    ///     return try await Purchases.shared.purchase(package: package).userCancelled ? .cancelled : .purchased
+    /// })
+    /// ```
+    ///
+    /// Sin manejador, la acción compra `productId` directamente con StoreKit (la hoja de Apple).
+    public static func register(purchase handler: @escaping @MainActor (PurchaseRequest) async throws -> PurchaseOutcome) {
+        runtime.purchaseHandler = handler
+    }
+
     /// Disparador de evento. Se puede llamar desde el wrapper de analítica para reenviarlos todos.
     public static func event(_ name: String) {
         runtime.noteEvent(name)

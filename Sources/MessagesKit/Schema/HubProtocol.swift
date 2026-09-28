@@ -8,10 +8,16 @@ public struct Capabilities: Sendable, Hashable, Codable {
     public var actions: [String]
     public var blocksVersion: Int
     public var schemaVersion: Int
+    /// Tipos de acción nuevos que sabe hacer este paquete (el hub no sirve campañas que usen
+    /// uno que la app no tenga, para no dejar botones muertos en versiones antiguas).
+    public var features: [String]
 
-    public init(routes: [String], actions: [String], blocksVersion: Int = messagesBlocksVersion, schemaVersion: Int = messagesSchemaVersion) {
+    public static let supportedFeatures = ["purchase"]
+
+    public init(routes: [String], actions: [String], blocksVersion: Int = messagesBlocksVersion, schemaVersion: Int = messagesSchemaVersion, features: [String] = Capabilities.supportedFeatures) {
         self.routes = routes; self.actions = actions
         self.blocksVersion = blocksVersion; self.schemaVersion = schemaVersion
+        self.features = features
     }
 }
 

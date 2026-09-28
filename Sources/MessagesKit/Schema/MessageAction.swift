@@ -25,6 +25,9 @@ public struct MessageAction: Sendable, Hashable, Codable {
         case openCampaign(campaignId: String)
         case track(event: String, properties: [String: JSONValue])
         case custom(name: String, payload: JSONValue)
+        /// Compra dentro de la app con la hoja de Apple. Con RevenueCat: `offering` + `packageId`
+        /// (lo resuelve el manejador de `Messages.register(purchase:)`); sin él, StoreKit con `productId`.
+        case purchase(productId: String?, offering: String?, packageId: String?)
         /// Una acción que esta versión no conoce. Se conserva para no perderla al reescribir.
         case unknown(type: String, raw: JSONValue)
     }
@@ -54,13 +57,14 @@ public struct MessageAction: Sendable, Hashable, Codable {
         case .openCampaign: "openCampaign"
         case .track: "track"
         case .custom: "custom"
+        case .purchase: "purchase"
         case .unknown(let type, _): type
         }
     }
 
     public static let allTypes = [
         "dismiss", "route", "deepLink", "openURL", "requestReview", "requestPushPermission",
-        "share", "copy", "openCampaign", "track", "custom",
+        "share", "copy", "openCampaign", "track", "custom", "purchase",
     ]
 
     /// Si tras la acción se cierra el mensaje (explícito o por defecto del tipo).
@@ -79,6 +83,7 @@ public struct MessageAction: Sendable, Hashable, Codable {
         switch kind {
         case .route(let name, _): return "route:\(name)"
         case .custom(let name, _): return "custom:\(name)"
+        case .purchase(let product, let offering, let package): return "purchase:\(package ?? product ?? offering ?? "")"
         case .openCampaign(let id): return "openCampaign:\(id)"
         case .track(let event, _): return "track:\(event)"
         default: return type
@@ -89,6 +94,7 @@ public struct MessageAction: Sendable, Hashable, Codable {
 
     private enum CodingKeys: String, CodingKey {
         case type, name, params, url, inApp, text, toast, campaignId, event, properties, payload, thenDismiss, trackAs
+        case productId, offering, package
     }
 
     public init(from decoder: Decoder) throws {
@@ -110,6 +116,7 @@ public struct MessageAction: Sendable, Hashable, Codable {
         case "openCampaign": kind = .openCampaign(campaignId: c.value(.campaignId, default: ""))
         case "track": kind = .track(event: c.value(.event, default: ""), properties: c.value(.properties, default: [:]))
         case "custom": kind = .custom(name: c.value(.name, default: ""), payload: c.value(.payload, default: .null))
+        case "purchase": kind = .purchase(productId: c.optional(.productId), offering: c.optional(.offering), packageId: c.optional(.package))
         default: kind = .unknown(type: type, raw: (try? JSONValue(from: decoder)) ?? .null)
         }
     }
@@ -145,6 +152,10 @@ public struct MessageAction: Sendable, Hashable, Codable {
         case .custom(let name, let payload):
             try c.encode(name, forKey: .name)
             if payload != .null { try c.encode(payload, forKey: .payload) }
+        case .purchase(let productId, let offering, let packageId):
+            try c.encodeIfPresent(productId, forKey: .productId)
+            try c.encodeIfPresent(offering, forKey: .offering)
+            try c.encodeIfPresent(packageId, forKey: .package)
         }
     }
 }

@@ -79,6 +79,8 @@ public enum CampaignValidator {
             case .deepLink(let url) where URL(string: url)?.scheme == nil: error(L.string("Deep link no válido: \(url)", "Invalid deep link: \(url)"))
             case .openURL(let url, _) where !(url.hasPrefix("https://") || url.hasPrefix("http://")): error(L.string("Enlace no válido: \(url)", "Invalid link: \(url)"))
             case .openCampaign(let id) where id.isEmpty || id == c.id: error(L.string("«Abrir campaña» necesita otra campaña.", "“Open campaign” needs a different campaign."))
+            case .purchase(let product, let offering, let package) where (product ?? "").isEmpty && (package ?? "").isEmpty && (offering ?? "").isEmpty:
+                error(L.string("La compra necesita un producto, o un offering y paquete de RevenueCat.", "The purchase needs a product, or a RevenueCat offering and package."))
             case .unknown(let t, _): error(L.string("Acción desconocida «\(t)».", "Unknown action “\(t)”."))
             default: break
             }
