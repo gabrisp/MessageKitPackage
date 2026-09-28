@@ -1,0 +1,34 @@
+{
+  "appId": "rewearly",
+  "name": "ReWearly",
+  "bundleId": "com.gabrisp.ReWearly",
+  "languages": ["es", "en"],
+  "defaultLanguage": "es",
+  "routes": {
+    "paywall": { "description": "Paywall de Pro", "params": [ { "name": "source" }, { "name": "offer" } ] },
+    "settings": { "description": "Ajustes" },
+    "importGarment": { "description": "Importar una prenda" }
+  },
+  "customActions": {
+    "claimGift": { "description": "Canjear un regalo", "params": [ { "name": "kind", "required": true } ] }
+  },
+  "screens": ["closet", "tryon", "outfits", "settings"],
+  "events": ["tryon_succeeded", "garment_added", "gift_granted", "onboarding_completed"],
+  "theme": {
+    "colors": {
+      "accent": { "light": "#7C5CFF", "dark": "#9E86FF" },
+      "background": { "light": "#F6F4F1", "dark": "#0E0D12" },
+      "positive": { "light": "#2FB67C", "dark": "#3BD18F" }
+    },
+    "fontDesign": "rounded",
+    "cardRadius": 34,
+    "imageRadius": 20,
+    "glass": "regular",
+    "glassTint": "accent",
+    "glassTintOpacity": 0.08
+  },
+  "dailyCap": 2,
+  "quietHoursAfterInstall": 24,
+  "quietUntilOnboarding": true,
+  "publicKey": "pk_rewearly_example"
+}

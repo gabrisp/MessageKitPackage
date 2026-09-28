@@ -1,0 +1,30 @@
+{
+  "id": "example-update-required",
+  "name": "Actualización obligatoria",
+  "template": "Actualización obligatoria",
+  "appIds": ["rewearly"],
+  "status": "draft",
+  "priority": 100,
+  "presentation": { "type": "alert" },
+  "dismissible": false,
+  "defaultLanguage": "es",
+  "content": {
+    "es": [
+      { "id": "ic", "type": "icon", "symbol": "arrow.down.app.fill", "tint": "accent", "size": 44 },
+      { "id": "h", "type": "heading", "text": "Actualiza ReWearly", "size": "medium", "align": "center" },
+      { "id": "t", "type": "text", "text": "Esta versión ya no funciona con el probador. Actualiza para seguir.", "style": "secondary", "align": "center" },
+      { "id": "b", "type": "button", "title": "Ir al App Store", "style": "primary", "action": { "type": "openURL", "url": "https://apps.apple.com/app/id0000000000", "inApp": false, "thenDismiss": true } }
+    ],
+    "en": [
+      { "id": "ic", "type": "icon", "symbol": "arrow.down.app.fill", "tint": "accent", "size": 44 },
+      { "id": "h", "type": "heading", "text": "Update ReWearly", "size": "medium", "align": "center" },
+      { "id": "t", "type": "text", "text": "This version no longer works with the fitting room. Update to continue.", "style": "secondary", "align": "center" },
+      { "id": "b", "type": "button", "title": "Go to the App Store", "style": "primary", "action": { "type": "openURL", "url": "https://apps.apple.com/app/id0000000000", "inApp": false, "thenDismiss": true } }
+    ]
+  },
+  "trigger": { "on": "launch" },
+  "audience": { "percent": 100, "rules": { "all": [ { "attr": "appVersion", "op": "lt", "value": "1.2" } ] } },
+  "schedule": { "timezone": "user" },
+  "frequency": { "mode": "every", "stopOnDismiss": false, "stopOnAction": false },
+  "schemaVersion": 1
+}

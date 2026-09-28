@@ -1,0 +1,44 @@
+{
+  "id": "example-offer",
+  "name": "Oferta con cuenta atrás",
+  "template": "Oferta con cuenta atrás",
+  "appIds": ["rewearly"],
+  "status": "draft",
+  "priority": 20,
+  "presentation": { "type": "fullscreen" },
+  "dismissible": true,
+  "defaultLanguage": "es",
+  "content": {
+    "es": [
+      { "id": "bd", "type": "badge", "text": "Oferta", "tint": "warning" },
+      { "id": "h", "type": "heading", "text": "Pro al 50 % solo este fin de semana", "size": "large" },
+      { "id": "im", "type": "image", "url": "https://picsum.photos/seed/rewearly-offer/1000/1000", "aspectRatio": 1, "fit": "fill" },
+      { "id": "st", "type": "stat", "value": "-50 %", "label": "en el plan anual" },
+      { "id": "cd", "type": "countdown", "until": "2026-10-05T22:00:00Z", "label": "Termina en", "expiredText": "La oferta ha terminado" },
+      { "id": "sp", "type": "spacer", "height": 8 },
+      { "id": "b1", "type": "button", "title": "Aprovechar la oferta", "style": "primary", "symbol": "crown.fill", "action": { "type": "route", "name": "paywall", "params": { "offer": "weekend50" } } },
+      { "id": "b2", "type": "button", "title": "Condiciones", "style": "link", "action": { "type": "openURL", "url": "https://rewearly.app/terms", "inApp": true, "thenDismiss": false } }
+    ],
+    "en": [
+      { "id": "bd", "type": "badge", "text": "Offer", "tint": "warning" },
+      { "id": "h", "type": "heading", "text": "Pro at 50% off this weekend only", "size": "large" },
+      { "id": "im", "type": "image", "url": "https://picsum.photos/seed/rewearly-offer/1000/1000", "aspectRatio": 1, "fit": "fill" },
+      { "id": "st", "type": "stat", "value": "-50%", "label": "on the yearly plan" },
+      { "id": "cd", "type": "countdown", "until": "2026-10-05T22:00:00Z", "label": "Ends in", "expiredText": "The offer has ended" },
+      { "id": "sp", "type": "spacer", "height": 8 },
+      { "id": "b1", "type": "button", "title": "Get the offer", "style": "primary", "symbol": "crown.fill", "action": { "type": "route", "name": "paywall", "params": { "offer": "weekend50" } } },
+      { "id": "b2", "type": "button", "title": "Terms", "style": "link", "action": { "type": "openURL", "url": "https://rewearly.app/terms", "inApp": true, "thenDismiss": false } }
+    ]
+  },
+  "trigger": { "on": "foreground", "delaySeconds": 1 },
+  "audience": { "percent": 100, "rules": { "all": [ { "attr": "isPro", "op": "eq", "value": false } ] } },
+  "schedule": { "startAt": "2026-10-03T07:00:00Z", "endAt": "2026-10-05T22:00:00Z", "timezone": "user" },
+  "frequency": { "mode": "daily", "maxImpressions": 2, "stopOnDismiss": false, "stopOnAction": true },
+  "push": {
+    "enabled": true,
+    "title": { "es": "Pro al 50 % 🎉", "en": "Pro at 50% off 🎉" },
+    "body": { "es": "Solo este fin de semana.", "en": "This weekend only." },
+    "when": "at", "at": "2026-10-03T09:00:00Z", "target": "topics", "topics": ["rewearly-free"]
+  },
+  "schemaVersion": 1
+}

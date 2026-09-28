@@ -1,0 +1,30 @@
+{
+  "id": "example-maintenance",
+  "name": "Aviso de mantenimiento",
+  "template": "Aviso de mantenimiento",
+  "appIds": ["rewearly"],
+  "status": "draft",
+  "priority": 50,
+  "presentation": { "type": "banner", "position": "top", "autoDismissSeconds": 8 },
+  "dismissible": true,
+  "defaultLanguage": "es",
+  "content": {
+    "es": [
+      { "id": "ic", "type": "icon", "symbol": "wrench.and.screwdriver.fill", "tint": "warning", "size": 28 },
+      { "id": "h", "type": "heading", "text": "Mantenimiento esta noche", "size": "medium" },
+      { "id": "t", "type": "text", "text": "Entre las 2:00 y las 3:00 el probador puede ir lento.", "style": "secondary" },
+      { "id": "b", "type": "button", "title": "Más info", "style": "link", "action": { "type": "openURL", "url": "https://status.rewearly.app", "inApp": true } }
+    ],
+    "en": [
+      { "id": "ic", "type": "icon", "symbol": "wrench.and.screwdriver.fill", "tint": "warning", "size": 28 },
+      { "id": "h", "type": "heading", "text": "Maintenance tonight", "size": "medium" },
+      { "id": "t", "type": "text", "text": "Between 2:00 and 3:00 the fitting room may be slow.", "style": "secondary" },
+      { "id": "b", "type": "button", "title": "More info", "style": "link", "action": { "type": "openURL", "url": "https://status.rewearly.app", "inApp": true } }
+    ]
+  },
+  "trigger": { "on": "screen", "screen": "closet", "delaySeconds": 0.5 },
+  "audience": { "percent": 100 },
+  "schedule": { "timezone": "Europe/Madrid" },
+  "frequency": { "mode": "daily", "stopOnDismiss": true, "stopOnAction": true },
+  "schemaVersion": 1
+}

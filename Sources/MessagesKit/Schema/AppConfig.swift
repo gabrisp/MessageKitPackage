@@ -1,0 +1,176 @@
+import Foundation
+
+/// Una app registrada en el hub: qué rutas y acciones sabe hacer, idiomas y su tema.
+public struct AppConfig: Sendable, Hashable, Codable, Identifiable {
+    public struct Param: Sendable, Hashable, Codable, Identifiable {
+        public var name: String
+        public var required: Bool
+        public var description: String?
+        public var id: String { name }
+
+        public init(name: String, required: Bool = false, description: String? = nil) {
+            self.name = name; self.required = required; self.description = description
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            name = try c.decode(String.self, forKey: .name)
+            required = c.value(.required, default: false)
+            description = c.optional(.description)
+        }
+    }
+
+    /// Una ruta (pantalla u hoja propia de la app) o una acción propia.
+    public struct Capability: Sendable, Hashable, Codable {
+        public var description: String?
+        public var params: [Param]
+
+        public init(description: String? = nil, params: [Param] = []) {
+            self.description = description; self.params = params
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            description = c.optional(.description)
+            params = c.value(.params, default: [])
+        }
+    }
+
+    public var appId: String
+    public var name: String
+    public var bundleId: String
+    public var languages: [String]
+    public var defaultLanguage: String
+    public var routes: [String: Capability]
+    public var customActions: [String: Capability]
+    /// Pantallas marcadas con `.messagePlacement(_:)`, para los menús del admin.
+    public var screens: [String]
+    /// Eventos que manda la app, para los menús del admin.
+    public var events: [String]
+    public var theme: ThemeSpec
+    /// Máximo de mensajes al día por usuario (todas las campañas). 0 = sin tope.
+    public var dailyCap: Int
+    /// Silencio tras la instalación, en horas.
+    public var quietHoursAfterInstall: Double
+    /// Además, nada hasta que la app mande `onboardingCompleted: true` en sus atributos.
+    public var quietUntilOnboarding: Bool
+    public var publicKey: String
+    /// Proyecto de PostHog para el enlace de Resultados (opcional).
+    public var posthogURL: String?
+
+    public var id: String { appId }
+
+    public init(
+        appId: String, name: String, bundleId: String = "", languages: [String] = ["es", "en"],
+        defaultLanguage: String = "es", routes: [String: Capability] = [:], customActions: [String: Capability] = [:],
+        screens: [String] = [], events: [String] = [], theme: ThemeSpec = .init(), dailyCap: Int = 2,
+        quietHoursAfterInstall: Double = 24, quietUntilOnboarding: Bool = true, publicKey: String = AppConfig.newPublicKey(),
+        posthogURL: String? = nil
+    ) {
+        self.appId = appId; self.name = name; self.bundleId = bundleId; self.languages = languages
+        self.defaultLanguage = defaultLanguage; self.routes = routes; self.customActions = customActions
+        self.screens = screens; self.events = events; self.theme = theme; self.dailyCap = dailyCap
+        self.quietHoursAfterInstall = quietHoursAfterInstall; self.quietUntilOnboarding = quietUntilOnboarding
+        self.publicKey = publicKey; self.posthogURL = posthogURL
+    }
+
+    public static func newPublicKey() -> String {
+        "pk_" + UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        appId = try c.decode(String.self, forKey: .appId)
+        name = c.value(.name, default: appId)
+        bundleId = c.value(.bundleId, default: "")
+        languages = c.value(.languages, default: ["es", "en"])
+        defaultLanguage = c.value(.defaultLanguage, default: "es")
+        routes = c.value(.routes, default: [:])
+        customActions = c.value(.customActions, default: [:])
+        screens = c.value(.screens, default: [])
+        events = c.value(.events, default: [])
+        theme = c.value(.theme, default: .init())
+        dailyCap = c.value(.dailyCap, default: 2)
+        quietHoursAfterInstall = c.value(.quietHoursAfterInstall, default: 24)
+        quietUntilOnboarding = c.value(.quietUntilOnboarding, default: true)
+        publicKey = c.value(.publicKey, default: "")
+        posthogURL = c.optional(.posthogURL)
+    }
+}
+
+/// El tema de una app en JSON (lo guarda el hub en `apps.theme` y lo usa el admin
+/// para que la vista previa se vea como en la app). En la app real se pasa un
+/// `MessagesTheme` directamente.
+public struct ThemeSpec: Sendable, Hashable, Codable {
+    /// Un color con variante clara y oscura, en hex (`#RRGGBB` o `#RRGGBBAA`).
+    public struct ColorPair: Sendable, Hashable, Codable {
+        public var light: String
+        public var dark: String
+
+        public init(_ light: String, _ dark: String? = nil) {
+            self.light = light; self.dark = dark ?? light
+        }
+
+        public init(from decoder: Decoder) throws {
+            if let single = try? decoder.singleValueContainer().decode(String.self) {
+                light = single; dark = single; return
+            }
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            light = try c.decode(String.self, forKey: .light)
+            dark = c.value(.dark, default: light)
+        }
+    }
+
+    public enum FontDesign: String, Sendable, Hashable, Codable, CaseIterable {
+        case `default`, rounded, serif, monospaced
+    }
+
+    public enum GlassStyle: String, Sendable, Hashable, Codable, CaseIterable {
+        case regular, clear
+    }
+
+    /// Token → color. Tokens estándar: `accent`, `primaryText`, `secondaryText`,
+    /// `background`, `positive`, `warning`, `danger`. Se pueden añadir los propios.
+    public var colors: [String: ColorPair]
+    public var fontDesign: FontDesign
+    public var cardRadius: Double
+    public var buttonRadius: Double?
+    public var imageRadius: Double
+    public var glass: GlassStyle
+    /// Token o hex para teñir el cristal. `nil` = sin tinte.
+    public var glassTint: String?
+    public var glassTintOpacity: Double
+
+    public init(
+        colors: [String: ColorPair] = ThemeSpec.defaultColors, fontDesign: FontDesign = .default,
+        cardRadius: Double = 32, buttonRadius: Double? = nil, imageRadius: Double = 18,
+        glass: GlassStyle = .regular, glassTint: String? = nil, glassTintOpacity: Double = 0.15
+    ) {
+        self.colors = colors; self.fontDesign = fontDesign; self.cardRadius = cardRadius
+        self.buttonRadius = buttonRadius; self.imageRadius = imageRadius; self.glass = glass
+        self.glassTint = glassTint; self.glassTintOpacity = glassTintOpacity
+    }
+
+    public static let defaultColors: [String: ColorPair] = [
+        "accent": .init("#0A84FF"),
+        "primaryText": .init("#000000", "#FFFFFF"),
+        "secondaryText": .init("#3C3C4399", "#EBEBF599"),
+        "background": .init("#F2F2F7", "#000000"),
+        "positive": .init("#34C759", "#30D158"),
+        "warning": .init("#FF9500", "#FF9F0A"),
+        "danger": .init("#FF3B30", "#FF453A"),
+    ]
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let custom: [String: ColorPair] = c.value(.colors, default: [:])
+        colors = ThemeSpec.defaultColors.merging(custom) { _, new in new }
+        fontDesign = c.value(.fontDesign, default: .default)
+        cardRadius = c.value(.cardRadius, default: 32)
+        buttonRadius = c.optional(.buttonRadius)
+        imageRadius = c.value(.imageRadius, default: 18)
+        glass = c.value(.glass, default: .regular)
+        glassTint = c.optional(.glassTint)
+        glassTintOpacity = c.value(.glassTintOpacity, default: 0.15)
+    }
+}

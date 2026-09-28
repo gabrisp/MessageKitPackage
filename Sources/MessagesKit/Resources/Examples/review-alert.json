@@ -1,0 +1,36 @@
+{
+  "id": "example-review",
+  "name": "Pide reseña",
+  "template": "Pide reseña",
+  "appIds": ["rewearly"],
+  "status": "draft",
+  "priority": 5,
+  "presentation": { "type": "alert" },
+  "dismissible": true,
+  "defaultLanguage": "es",
+  "content": {
+    "es": [
+      { "id": "ic", "type": "icon", "symbol": "star.bubble.fill", "tint": "accent", "size": 44 },
+      { "id": "h", "type": "heading", "text": "¿Te gusta ReWearly?", "size": "medium", "align": "center" },
+      { "id": "t", "type": "text", "text": "Una reseña nos ayuda muchísimo a seguir mejorando.", "style": "secondary", "align": "center" },
+      { "id": "r", "type": "buttonRow", "buttons": [
+        { "id": "no", "title": "Ahora no", "style": "secondary", "action": { "type": "dismiss", "trackAs": "later" } },
+        { "id": "yes", "title": "Valorar", "style": "primary", "action": { "type": "requestReview", "trackAs": "review" } }
+      ]}
+    ],
+    "en": [
+      { "id": "ic", "type": "icon", "symbol": "star.bubble.fill", "tint": "accent", "size": 44 },
+      { "id": "h", "type": "heading", "text": "Enjoying ReWearly?", "size": "medium", "align": "center" },
+      { "id": "t", "type": "text", "text": "A review helps us a lot to keep improving.", "style": "secondary", "align": "center" },
+      { "id": "r", "type": "buttonRow", "buttons": [
+        { "id": "no", "title": "Not now", "style": "secondary", "action": { "type": "dismiss", "trackAs": "later" } },
+        { "id": "yes", "title": "Rate", "style": "primary", "action": { "type": "requestReview", "trackAs": "review" } }
+      ]}
+    ]
+  },
+  "trigger": { "on": "event", "event": "tryon_succeeded", "delaySeconds": 1 },
+  "audience": { "percent": 100, "rules": { "all": [ { "attr": "daysSinceInstall", "op": "gte", "value": 5 } ] } },
+  "schedule": { "timezone": "user", "hours": { "from": 10, "to": 21 } },
+  "frequency": { "mode": "cooldown", "cooldownHours": 720, "maxImpressions": 3, "stopOnDismiss": false, "stopOnAction": true },
+  "schemaVersion": 1
+}

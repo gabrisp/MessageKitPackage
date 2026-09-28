@@ -1,0 +1,42 @@
+{
+  "id": "example-whats-new",
+  "name": "Novedades 1.3",
+  "template": "Novedades",
+  "appIds": ["rewearly"],
+  "status": "draft",
+  "priority": 10,
+  "presentation": { "type": "sheet", "detents": ["medium", "large"] },
+  "dismissible": true,
+  "defaultLanguage": "es",
+  "content": {
+    "es": [
+      { "id": "h1", "type": "heading", "text": "Novedades de la 1.3", "size": "large" },
+      { "id": "im", "type": "image", "url": "https://picsum.photos/seed/rewearly-news/1200/675", "aspectRatio": 1.7778, "fit": "fill", "alt": "Nuevo probador" },
+      { "id": "ls", "type": "list", "items": [
+        { "id": "a", "symbol": "sparkles", "text": "**Probador mejorado**: resultados más realistas." },
+        { "id": "b", "symbol": "tag", "text": "Etiquetas para organizar tu armario." },
+        { "id": "c", "symbol": "icloud", "text": "Copia en iCloud automática." }
+      ]},
+      { "id": "bt", "type": "button", "title": "Probar Pro gratis", "style": "primary", "action": { "type": "route", "name": "paywall", "params": { "source": "whats_new" }, "trackAs": "open_paywall" } }
+    ],
+    "en": [
+      { "id": "h1", "type": "heading", "text": "What's new in 1.3", "size": "large" },
+      { "id": "im", "type": "image", "url": "https://picsum.photos/seed/rewearly-news/1200/675", "aspectRatio": 1.7778, "fit": "fill", "alt": "New fitting room" },
+      { "id": "ls", "type": "list", "items": [
+        { "id": "a", "symbol": "sparkles", "text": "**Better try-on**: more realistic results." },
+        { "id": "b", "symbol": "tag", "text": "Tags to organize your closet." },
+        { "id": "c", "symbol": "icloud", "text": "Automatic iCloud backup." }
+      ]},
+      { "id": "bt", "type": "button", "title": "Try Pro for free", "style": "primary", "action": { "type": "route", "name": "paywall", "params": { "source": "whats_new" }, "trackAs": "open_paywall" } }
+    ]
+  },
+  "trigger": { "on": "launch", "delaySeconds": 1.5 },
+  "audience": { "percent": 100, "rules": { "all": [
+    { "attr": "isPro", "op": "eq", "value": false },
+    { "attr": "language", "op": "in", "value": ["es"] },
+    { "attr": "daysSinceInstall", "op": "gte", "value": 3 }
+  ]}},
+  "schedule": { "timezone": "user" },
+  "frequency": { "mode": "once", "stopOnDismiss": true, "stopOnAction": true },
+  "schemaVersion": 1
+}

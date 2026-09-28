@@ -1,0 +1,28 @@
+{
+  "id": "example-toast",
+  "name": "Toast de código regalo",
+  "template": "Toast",
+  "appIds": ["rewearly"],
+  "status": "draft",
+  "priority": 0,
+  "presentation": { "type": "toast", "position": "top", "autoDismissSeconds": 4 },
+  "dismissible": true,
+  "defaultLanguage": "es",
+  "content": {
+    "es": [
+      { "id": "ic", "type": "icon", "symbol": "gift.fill", "tint": "positive", "size": 22 },
+      { "id": "t", "type": "text", "text": "Tienes **1 prueba extra** de regalo" },
+      { "id": "b", "type": "button", "title": "Usar", "style": "glass", "action": { "type": "custom", "name": "claimGift", "payload": { "kind": "tryon" } } }
+    ],
+    "en": [
+      { "id": "ic", "type": "icon", "symbol": "gift.fill", "tint": "positive", "size": 22 },
+      { "id": "t", "type": "text", "text": "You got **1 extra try-on** as a gift" },
+      { "id": "b", "type": "button", "title": "Use", "style": "glass", "action": { "type": "custom", "name": "claimGift", "payload": { "kind": "tryon" } } }
+    ]
+  },
+  "trigger": { "on": "event", "event": "gift_granted" },
+  "audience": { "percent": 100 },
+  "schedule": { "timezone": "user" },
+  "frequency": { "mode": "every", "maxPerDay": 2, "stopOnDismiss": false, "stopOnAction": false },
+  "schemaVersion": 1
+}
