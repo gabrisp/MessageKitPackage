@@ -126,10 +126,13 @@ public struct MessageBlockPreview: View {
 
     public var body: some View {
         let testCampaign = Campaign(name: "Bloque", defaultLanguage: language)
-        BlockView(block: block)
-            .padding(20)
-            .frame(maxWidth: 360)
-            .glassEffect(theme.surfaceGlass(), in: .rect(cornerRadius: theme.cardRadius, style: .continuous))
+        // Tarjeta y botones de cristal agrupados: nunca cristal suelto encima de cristal.
+        GlassEffectContainer(spacing: 12) {
+            BlockView(block: block)
+                .padding(20)
+                .frame(maxWidth: 360)
+                .glassEffect(theme.surfaceGlass(), in: .rect(cornerRadius: theme.cardRadius, style: .continuous))
+        }
             .environment(\.messagesTheme, theme)
             .environment(\.messageSurface, MessageSurface(style))
             .environment(\.messageLanguage, language)
