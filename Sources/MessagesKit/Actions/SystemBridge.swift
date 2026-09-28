@@ -68,14 +68,20 @@ enum SystemBridge {
         #endif
     }
 
-    /// Desarrollo (APNs sandbox) si la app lleva un perfil con `aps-environment` de desarrollo.
-    /// Las de TestFlight y App Store usan producción.
+    /// APNs sandbox para las builds de desarrollo, producción para TestFlight y App Store.
+    /// En Debug (lo que se ejecuta desde Xcode) siempre es sandbox. En Release, lo decide el
+    /// perfil de la app: `aps-environment` de desarrollo → sandbox; sin perfil (App Store,
+    /// TestFlight) → producción.
     nonisolated static var isSandboxBuild: Bool {
+        #if DEBUG
+        return true
+        #else
         guard let url = Bundle.main.url(forResource: "embedded", withExtension: "mobileprovision"),
               let data = try? Data(contentsOf: url)
         else { return false }
         let text = String(decoding: data, as: UTF8.self)
         guard let range = text.range(of: "<key>aps-environment</key>") else { return false }
-        return text[range.upperBound...].prefix(80).contains("development")
+        return text[range.upperBound...].prefix(120).contains("development")
+        #endif
     }
 }
