@@ -90,12 +90,13 @@ public struct AppReport: Sendable, Hashable, Codable {
     }
 
     /// Mezcla el informe en una app del admin: añade lo que falte y respeta lo ya escrito
-    /// (descripciones, parámetros y el tipo de los atributos que ya estaban). El tema se
-    /// sustituye por el de la app.
+    /// (descripciones, parámetros y el tipo de los atributos que ya estaban). El tema y el
+    /// bundle id se sustituyen por los de la app.
     public func merged(into app: AppConfig) -> AppConfig {
         let r = cleaned()
         var out = app
-        if out.bundleId.isEmpty { out.bundleId = r.bundleId }
+        // El de la app manda: es el `Bundle.main` de verdad, y con otro los push no salen (APNs: TopicDisallowed).
+        if !r.bundleId.isEmpty { out.bundleId = r.bundleId }
         if out.name.isEmpty || out.name == out.appId { out.name = r.name.isEmpty ? out.appId : r.name }
         for l in r.languages where !out.languages.contains(l) { out.languages.append(l) }
         for route in r.routes { out.routes[route] = Self.merge(out.routes[route], r.routeParams[route] ?? []) }

@@ -26,6 +26,7 @@ public enum Messages {
     /// Una pantalla u hoja propia que se puede abrir por nombre (acción `route`).
     public static func register(route name: String, _ handler: @escaping @MainActor (RouteParams) -> Void) {
         runtime.routes[name] = handler
+        runtime.capabilitiesChanged()
     }
 
     /// Igual, declarando sus parámetros: el admin (tras «Copiar config del admin») enseña el
@@ -41,17 +42,20 @@ public enum Messages {
     public static func register(route name: String, params: [AppConfig.Param], _ handler: @escaping @MainActor (RouteParams) -> Void) {
         runtime.routes[name] = handler
         runtime.routeParams[name] = params
+        runtime.capabilitiesChanged()
     }
 
     /// Una acción propia (acción `custom`).
     public static func register(action name: String, _ handler: @escaping @MainActor (JSONValue) -> Void) {
         runtime.customActions[name] = handler
+        runtime.capabilitiesChanged()
     }
 
     /// Igual, declarando los campos de su `payload` (el admin los enseña como formulario).
     public static func register(action name: String, params: [AppConfig.Param], _ handler: @escaping @MainActor (JSONValue) -> Void) {
         runtime.customActions[name] = handler
         runtime.actionParams[name] = params
+        runtime.capabilitiesChanged()
     }
 
     /// Cómo compra la app (acción `purchase`). Con RevenueCat:

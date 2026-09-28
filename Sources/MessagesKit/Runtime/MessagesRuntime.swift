@@ -67,6 +67,16 @@ final class MessagesRuntime {
     private(set) var lastSync: SyncStatus?
     /// Campaña de la última acción (para apuntar el resultado de una compra).
     private var lastActionCampaignId: String?
+    /// La caché del disco ya está cargada.
+    private var loaded = false
+    /// El token de avisos: el sistema lo da nada más arrancar, a menudo antes de `configure`.
+    /// Se guarda, se manda en cuanto hay configuración y se vuelve a mandar si cambia el usuario.
+    private var deviceToken: (token: Data, sandbox: Bool?)?
+    /// Avisos tocados antes de estar listos (abrir la app desde un push): se atienden al estarlo.
+    private var earlyNotifications: [[AnyHashable: Any]] = []
+    /// Las capacidades (rutas y acciones) de la última petición al hub.
+    private var sentCapabilities: Capabilities?
+    private var capabilitiesTask: Task<Void, Never>?
 
     init(presenter: MessagePresenter) {
         self.presenter = presenter
@@ -86,8 +96,14 @@ final class MessagesRuntime {
         self.store = store
         InstallDate.ensure()
         Task {
+            // Lo apuntado antes de cargar la caché (impresiones, forzadas) no se pierde.
+            let early = state
             state = await store.load()
+            state.pendingEvents.append(contentsOf: early.pendingEvents)
+            for f in early.forced where !state.forced.contains(where: { $0.id == f.id }) { state.forced.append(f) }
+            loaded = true
             MessagesLog.debug("Caché: \(state.campaigns.count) campañas, \(state.pendingEvents.count) eventos pendientes")
+            if let deviceToken { sendDeviceToken(deviceToken.token, sandbox: deviceToken.sandbox) }
             // Al abrir: el hub con un tope de tiempo; si no llega, la caché.
             let timeout = config.launchTimeout
             let fetch = Task { await self.refresh(force: true) }
@@ -130,6 +146,10 @@ final class MessagesRuntime {
         guard !launchEvaluated, launchReady, layerVisible else { return }
         launchEvaluated = true
         presentForced()
+        // Los avisos tocados al abrir la app (antes de estar listos).
+        let notifications = earlyNotifications
+        earlyNotifications.removeAll()
+        for userInfo in notifications { _ = handleNotification(userInfo) }
         fire(.launch)
         // Lo que pasó mientras se esperaba al hub.
         for screen in activeScreens.keys { fire(.screen(screen)) }
@@ -148,11 +168,13 @@ final class MessagesRuntime {
             let started = ContinuousClock.now
             let uid = await userId()
             do {
+                let capabilities = Capabilities(routes: routes.keys.sorted(), actions: customActions.keys.sorted())
+                sentCapabilities = capabilities
                 let request = MessagesRequest(
                     appId: config.appId, publicKey: config.publicKey,
                     userId: uid, locale: language,
                     attributes: await attributes(),
-                    capabilities: Capabilities(routes: routes.keys.sorted(), actions: customActions.keys.sorted()),
+                    capabilities: capabilities,
                     etag: state.campaigns.isEmpty ? nil : state.etag,
                     sdkVersion: messagesKitVersion
                 )
@@ -189,10 +211,30 @@ final class MessagesRuntime {
         if launchEvaluated { presentForced() }
     }
 
+    /// Una ruta o acción registrada después de pedir los mensajes: el hub no sirve campañas con
+    /// botones que la app no sabe ejecutar, así que se vuelven a pedir (una vez, agrupadas).
+    func capabilitiesChanged() {
+        guard let sent = sentCapabilities else { return }
+        let now = Capabilities(routes: routes.keys.sorted(), actions: customActions.keys.sorted())
+        guard now.routes != sent.routes || now.actions != sent.actions else { return }
+        capabilitiesTask?.cancel()
+        capabilitiesTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled, let self else { return }
+            MessagesLog.debug("Rutas o acciones nuevas: se vuelven a pedir los mensajes")
+            await self.refreshFromSignal()
+        }
+    }
+
+    /// Una campaña sin bloques en ningún idioma es solo de push: no hay nada que enseñar.
+    private func hasContent(_ c: Campaign) -> Bool {
+        !c.blocks(for: language).isEmpty
+    }
+
     /// Las forzadas ("Enviar a un usuario") salen en cuanto se puede, sin disparador.
     private func presentForced() {
         guard layerVisible else { return }
-        for c in state.forced where !presenter.contains(campaignId: c.id) {
+        for c in state.forced where !presenter.contains(campaignId: c.id) && hasContent(c) {
             presenter.enqueue(MessageRequest(campaign: c, language: language, mode: .live))
         }
     }
@@ -225,7 +267,7 @@ final class MessagesRuntime {
         }
         let now = Date.now
         let candidates = state.campaigns
-            .filter { trigger.matches($0.trigger) && (ids?.contains($0.id) ?? true) }
+            .filter { trigger.matches($0.trigger) && (ids?.contains($0.id) ?? true) && hasContent($0) }
             .sorted { $0.priority > $1.priority }
         for campaign in candidates where isEligibleLocally(campaign, now: now) {
             let elapsed = now.timeIntervalSince(sessionStart)
@@ -425,6 +467,13 @@ final class MessagesRuntime {
     // MARK: Push
 
     func registerDeviceToken(_ token: Data, sandbox: Bool?) {
+        deviceToken = (token, sandbox)
+        // Sin `configure` todavía (lo normal: el token llega en `didFinishLaunching`), se manda al configurar.
+        guard loaded else { return }
+        sendDeviceToken(token, sandbox: sandbox)
+    }
+
+    private func sendDeviceToken(_ token: Data, sandbox: Bool?) {
         guard let config, let client else { return }
         let hex = token.map { String(format: "%02x", $0) }.joined()
         Task {
@@ -452,13 +501,15 @@ final class MessagesRuntime {
     /// abrirse, sin tener que salir y volver a entrar. No hay ninguna conexión abierta.
     func refreshFromSignal() async {
         guard config != nil else { return }
-        let before = Set(state.campaigns.map(\.id))
+        let before = Dictionary(state.campaigns.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         await refresh(force: true)
         guard launchEvaluated else { return }
         presentForced()
-        let fresh = Set(state.campaigns.map(\.id)).subtracting(before)
+        // Las nuevas y las que han cambiado (editadas y vueltas a publicar). La frecuencia local
+        // sigue mandando: lo que ya se vio y era "una vez" no vuelve a salir.
+        let fresh = Set(state.campaigns.filter { before[$0.id] != $0 }.map(\.id))
         guard !fresh.isEmpty else { return }
-        MessagesLog.debug("Aviso del hub: \(fresh.count) campañas nuevas")
+        MessagesLog.debug("Aviso del hub: \(fresh.count) campañas nuevas o cambiadas")
         fire(.launch, only: fresh)
         fire(.foreground, only: fresh)
         for screen in activeScreens.keys { fire(.screen(screen), only: fresh) }
@@ -466,6 +517,12 @@ final class MessagesRuntime {
 
     /// Lo llama la app al abrir un aviso. Devuelve `true` si era de MessagesKit.
     func handleNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
+        let isOurs = Self.isRefreshSignal(userInfo) || userInfo["campaignId"] is String
+        // Abriendo la app desde el aviso: aún no hay configuración ni caché. Se atiende al estar listos.
+        if isOurs, !launchEvaluated {
+            earlyNotifications.append(userInfo)
+            return true
+        }
         if Self.isRefreshSignal(userInfo) {
             if let campaignId = userInfo["campaignId"] as? String { record(.pushOpened, nil, campaignId: campaignId) }
             Task { await refreshFromSignal() }
@@ -484,15 +541,17 @@ final class MessagesRuntime {
 
     /// Enseña una campaña concreta (de la caché o, si no está, tras pedirla al hub).
     func open(campaignId: String) {
-        if let c = (state.campaigns + state.forced).first(where: { $0.id == campaignId }) {
-            presenter.enqueue(MessageRequest(campaign: c, language: language, mode: .live))
-            return
-        }
-        Task {
-            await refresh(force: true)
-            if let c = state.campaigns.first(where: { $0.id == campaignId }) {
+        func show() -> Bool {
+            guard let c = (state.campaigns + state.forced).first(where: { $0.id == campaignId }) else { return false }
+            if hasContent(c), !presenter.contains(campaignId: c.id) {
                 presenter.enqueue(MessageRequest(campaign: c, language: language, mode: .live))
             }
+            return true
+        }
+        if show() { return }
+        Task {
+            await refresh(force: true)
+            if !show() { MessagesLog.debug("La campaña \(campaignId) ya no le toca a este usuario") }
         }
     }
 
@@ -522,7 +581,11 @@ final class MessagesRuntime {
         return id
     }
 
-    func invalidateUser() { cachedUserId = nil }
+    /// Otro usuario: su id nuevo en las peticiones y el token de avisos pasa a ser suyo.
+    func invalidateUser() {
+        cachedUserId = nil
+        if loaded, let deviceToken { sendDeviceToken(deviceToken.token, sandbox: deviceToken.sandbox) }
+    }
 
     func noteEvent(_ name: String) {
         if state.seenEvents.insert(name).inserted { scheduleSave() }

@@ -75,6 +75,15 @@ struct AppReportTests {
         #expect(merged.attributes.contains { $0.name == "isCreator" && $0.kind == .bool })
     }
 
+    @Test("El bundle id de la app corrige el del admin (si no, APNs rechaza los push)")
+    func bundleIdFromApp() {
+        let existing = AppConfig(appId: "myapp", name: "My App", bundleId: "com.example.wrong")
+        #expect(report().merged(into: existing).bundleId == "com.example.myapp")
+        var empty = report()
+        empty.bundleId = ""
+        #expect(empty.merged(into: existing).bundleId == "com.example.wrong", "Sin bundle en el informe, se queda el que había")
+    }
+
     @Test("Tipo de atributo deducido del valor")
     func inferredKinds() {
         #expect(AppConfig.Attribute.Kind.inferred(from: true) == .bool)
