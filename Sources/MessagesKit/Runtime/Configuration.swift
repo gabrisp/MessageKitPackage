@@ -3,7 +3,7 @@ import Foundation
 /// Lo que cada app pasa a `Messages.configure(_:)`.
 public struct MessagesConfiguration: Sendable {
     public var appId: String
-    /// Endpoint de Appwrite del hub, p. ej. `https://appwrite.repzet.app/v1`.
+    /// Endpoint de Appwrite del hub, p. ej. `http://api-endpoint.com`.
     public var endpoint: URL
     public var projectId: String
     /// Clave pública de la app en el hub (no es secreta).

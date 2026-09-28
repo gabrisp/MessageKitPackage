@@ -37,7 +37,7 @@ extension MessagesTheme {
 // Al arrancar (App.init o el primer .task):
 Messages.configure(.init(
     appId: "rewearly",
-    endpoint: URL(string: "https://appwrite.repzet.app/v1")!,
+    endpoint: URL(string: "http://api-endpoint.com")!,
     projectId: "remote-hub",
     publicKey: "pk_…",                               // la de la app en el admin → Apps
     userId: { await identity.id() },                 // el mismo id de RevenueCat y PostHog
