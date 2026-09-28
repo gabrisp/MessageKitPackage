@@ -130,8 +130,11 @@ final class MessagesRuntime {
         defer { if phase != .inactive { lastPhase = phase } }
         switch phase {
         case .active where lastPhase == .background:
+            // Al volver a la app: siempre se pregunta al hub (con etag, casi gratis) y lo nuevo o
+            // cambiado sale por sus disparadores. Es el único momento, junto a abrirla y tocar un
+            // aviso, en que aparecen mensajes nuevos: nunca a mitad de uso.
             Task {
-                await refresh(force: false)
+                await refreshAndPresentNew()
                 fire(.foreground)
             }
         case .background:
@@ -208,7 +211,6 @@ final class MessagesRuntime {
             MessagesLog.debug("Hub: \(state.campaigns.count) campañas, \(forced.count) forzadas")
         }
         scheduleSave()
-        if launchEvaluated { presentForced() }
     }
 
     /// Una ruta o acción registrada después de pedir los mensajes: el hub no sirve campañas con
@@ -222,7 +224,7 @@ final class MessagesRuntime {
             try? await Task.sleep(for: .seconds(1))
             guard !Task.isCancelled, let self else { return }
             MessagesLog.debug("Rutas o acciones nuevas: se vuelven a pedir los mensajes")
-            await self.refreshFromSignal()
+            await self.refreshAndPresentNew()
         }
     }
 
@@ -491,15 +493,14 @@ final class MessagesRuntime {
         }
     }
 
-    /// Si un aviso es de los que solo dicen "hay cambios" (silencioso o de vista previa).
+    /// Si un aviso es de los que solo dicen "hay cambios" (el de "Enviar prueba").
     static func isRefreshSignal(_ userInfo: [AnyHashable: Any]) -> Bool {
         userInfo["messageskit"] as? String == "refresh" || userInfo["preview"] != nil
     }
 
-    /// El hub avisa de que algo ha cambiado (push silencioso, o el de "Enviar a un usuario"):
-    /// se piden los mensajes y lo nuevo pasa por sus disparadores como si la app acabara de
-    /// abrirse, sin tener que salir y volver a entrar. No hay ninguna conexión abierta.
-    func refreshFromSignal() async {
+    /// Pide los mensajes y lo nuevo (o cambiado) pasa por sus disparadores como si la app acabara
+    /// de abrirse. Al volver a primer plano, al tocar un aviso y si la app registra rutas tarde.
+    func refreshAndPresentNew() async {
         guard config != nil else { return }
         let before = Dictionary(state.campaigns.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
         await refresh(force: true)
@@ -509,7 +510,7 @@ final class MessagesRuntime {
         // sigue mandando: lo que ya se vio y era "una vez" no vuelve a salir.
         let fresh = Set(state.campaigns.filter { before[$0.id] != $0 }.map(\.id))
         guard !fresh.isEmpty else { return }
-        MessagesLog.debug("Aviso del hub: \(fresh.count) campañas nuevas o cambiadas")
+        MessagesLog.debug("\(fresh.count) campañas nuevas o cambiadas")
         fire(.launch, only: fresh)
         fire(.foreground, only: fresh)
         for screen in activeScreens.keys { fire(.screen(screen), only: fresh) }
@@ -525,7 +526,7 @@ final class MessagesRuntime {
         }
         if Self.isRefreshSignal(userInfo) {
             if let campaignId = userInfo["campaignId"] as? String { record(.pushOpened, nil, campaignId: campaignId) }
-            Task { await refreshFromSignal() }
+            Task { await refreshAndPresentNew() }
             return true
         }
         guard let campaignId = userInfo["campaignId"] as? String else { return false }

@@ -86,7 +86,8 @@ public enum Messages {
         presenter.isSuppressed = suppressed
     }
 
-    /// Vuelve a pedir los mensajes (p. ej. tras hacerse Pro o terminar el onboarding).
+    /// Vuelve a pedir los mensajes (p. ej. tras hacerse Pro o terminar el onboarding). Lo nuevo
+    /// sale al volver a la app o por su disparador de pantalla o evento, no en ese momento.
     /// Devuelve cómo ha ido (también en `Messages.lastSync`).
     @discardableResult
     public static func refresh() async -> SyncStatus? {
@@ -122,23 +123,23 @@ public enum Messages {
         runtime.handleNotification(userInfo)
     }
 
-    /// Pásale los avisos silenciosos (`didReceiveRemoteNotification`). Si el hub avisa de
-    /// cambios, pide los mensajes y lo nuevo sale sin reabrir la app. `true` si era de MessagesKit.
+    /// Pásale los avisos que llegan por detrás (`didReceiveRemoteNotification`). Si es de
+    /// MessagesKit, deja los mensajes pedidos para cuando se abra o se vuelva a la app, pero no
+    /// enseña nada ahora: nunca sale un mensaje a mitad de uso. `true` si era de MessagesKit.
     @discardableResult
     public static func didReceiveRemoteNotification(_ userInfo: [AnyHashable: Any]) async -> Bool {
         guard MessagesRuntime.isRefreshSignal(userInfo) else { return false }
-        await runtime.refreshFromSignal()
+        await runtime.refresh(force: true)
         return true
     }
 
-    /// Pásale los avisos que llegan con la app abierta (`willPresent`). Si es un aviso de
-    /// MessagesKit (cambios o vista previa), refresca y devuelve `true`: no hace falta enseñar
-    /// el banner del sistema, porque el mensaje sale dentro de la app.
+    /// Pásale los avisos que llegan con la app abierta (`willPresent`). Devuelve si hay que
+    /// esconder el banner del sistema: siempre `false`, porque los mensajes no salen solos a
+    /// mitad de uso. Se ve el banner y, al tocarlo, sale el mensaje.
     @discardableResult
     public static func willPresentNotification(_ userInfo: [AnyHashable: Any]) -> Bool {
-        guard MessagesRuntime.isRefreshSignal(userInfo) else { return false }
-        Task { await runtime.refreshFromSignal() }
-        return true
+        if MessagesRuntime.isRefreshSignal(userInfo) { Task { await runtime.refresh(force: true) } }
+        return false
     }
 
     // MARK: Vista previa y depuración

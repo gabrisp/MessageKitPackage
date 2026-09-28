@@ -99,23 +99,30 @@ CopyAdminConfigButton()   // o: let json = await Messages.appReport()
 
 Copia un JSON, que incluye los parámetros declarados de cada ruta y acción (tipo, obligatorios, valores permitidos). En el admin: **Apps → botón de pegar**. Crea la app si no existe, o le añade lo que falte y le pone el tema de la app si ya existía, sin tocar lo que ya hubieras escrito. Las pantallas y eventos salen en cuanto la app los ha visto al menos una vez. No se manda nada al hub por su cuenta.
 
-### Pushes y avisos de cambios
+### Pushes
 
 ```swift
 // AppDelegate
+func application(_ app: UIApplication, didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+    UNUserNotificationCenter.current().delegate = self
+    app.registerForRemoteNotifications()       // sin esperar al permiso; el token se guarda hasta `configure`
+    return true
+}
+
 func application(_ app: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken token: Data) {
     Messages.registerDeviceToken(token)        // detecta sandbox (build de Xcode) o producción (TestFlight y App Store)
 }
 
-// Push silencioso del hub ("hay cambios"): pide los mensajes y lo nuevo sale sin reabrir la app.
+// Deja pedidos los mensajes (p. ej. el de "Enviar prueba"), sin enseñar nada todavía.
 func application(_ app: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any]) async -> UIBackgroundFetchResult {
     await Messages.didReceiveRemoteNotification(userInfo) ? .newData : .noData
 }
 
 // UNUserNotificationCenterDelegate
 func userNotificationCenter(_ c: UNUserNotificationCenter, willPresent n: UNNotification) async -> UNNotificationPresentationOptions {
-    // Con la app abierta: si es de MessagesKit, el mensaje sale dentro y no hace falta el banner.
-    await Messages.willPresentNotification(n.request.content.userInfo) ? [] : [.banner, .sound]
+    // Con la app abierta se ve el banner del sistema; el mensaje sale al tocarlo.
+    Messages.willPresentNotification(n.request.content.userInfo)
+    return [.banner, .sound]
 }
 
 func userNotificationCenter(_ c: UNUserNotificationCenter, didReceive r: UNNotificationResponse) async {
@@ -125,8 +132,9 @@ func userNotificationCenter(_ c: UNUserNotificationCenter, didReceive r: UNNotif
 
 En el target: *Signing & Capabilities* → **Push Notifications** y **Background Modes → Remote notifications**.
 
-- **Sin conexiones abiertas.** Cuando se publica, pausa o edita una campaña, el hub manda un push silencioso a esa app. Si está abierta (o iOS la despierta), pide los mensajes y lo nuevo pasa por sus disparadores como si acabara de abrirse. iOS raciona los silenciosos (unos pocos por hora); si alguno no llega, se recoge al abrir o al volver a primer plano.
-- "Enviar a un usuario" (desde el admin) sale al momento si la app está abierta.
+- **Nunca a mitad de uso.** Lo que se publica o cambia en el admin se recoge al abrir la app, al volver a ella desde segundo plano o al tocar un push, y entonces pasa por sus disparadores. No hay conexiones abiertas ni pushes silenciosos de "hay cambios".
+- "Enviar prueba" (desde el admin) manda un push "Vista previa": al tocarlo, o al volver a la app, sale el mensaje.
+- Tocar el push de una campaña abre su acción (por defecto, el propio mensaje). Si la campaña es solo de push (sin bloques), solo abre la app.
 - El permiso de avisos lo puede pedir una campaña (acción `requestPushPermission`).
 - En el hub basta con una clave `.p8` de APNs del equipo (*Team Scoped*, *Sandbox & Production*): cada app que se da de alta en el admin tiene sus proveedores sola.
 
@@ -136,7 +144,7 @@ En el target: *Signing & Capabilities* → **Push Notifications** y **Background
 
 ## Cómo decide
 
-1. Pide las campañas al hub (función `messages`) al abrir, al volver a primer plano (si hace más de 5 min) y cuando llega un push silencioso. Al abrir espera como mucho 4 s; si no, usa la caché del disco.
+1. Pide las campañas al hub (función `messages`) al abrir, cada vez que se vuelve a la app desde segundo plano y al tocar un push. Al abrir espera como mucho 4 s; si no, usa la caché del disco.
 2. El hub filtra por:
    - audiencia (reglas y porcentaje)
    - calendario
