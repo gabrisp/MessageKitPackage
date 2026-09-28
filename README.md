@@ -1,6 +1,6 @@
 # MessagesKit
 
-Mensajes para las apps sin publicar versión: alerts de cristal, banners, toasts, sheets construidos con bloques desde el servidor y pantalla completa, con acciones, disparadores, frecuencia e impresiones. Habla con el hub de Appwrite (`remote-hub`) por REST. No tiene dependencias.
+Mensajes a los usuarios de tus apps (ya publicadas en el App Store) que se crean y cambian desde el servidor, sin sacar una versión nueva cada vez: alerts de cristal, banners, toasts, sheets construidos con bloques desde el servidor y pantalla completa, con acciones, disparadores, frecuencia e impresiones. Habla con el hub de Appwrite (`remote-hub`) por REST. No tiene dependencias.
 
 - iOS 26+ (y macOS 26+ para el admin). Swift 6.
 - Liquid Glass nativo: el alert y el banner son `.glassEffect`, los botones `.glass`/`.glassProminent`, y todo va agrupado en `GlassEffectContainer`.
