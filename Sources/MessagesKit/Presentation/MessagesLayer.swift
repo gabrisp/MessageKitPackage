@@ -64,10 +64,10 @@ struct MessagesLayerModifier: ViewModifier {
                 let handler = presenter.handler(for: request)
                 switch request.style {
                 case .alert:
+                    // Tocar fuera no cierra nada: solo tapa la app de detrás (como un alert del sistema).
                     Color.black.opacity(0.3)
                         .ignoresSafeArea()
                         .contentShape(.rect)
-                        .onTapGesture { if request.dismissible { presenter.dismiss(.gesture, id: request.id) } }
                         .accessibilityHidden(true)
                         .transition(.opacity)
                     AlertCard(blocks: request.blocks, dismissible: request.dismissible) {
