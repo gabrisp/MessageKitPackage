@@ -82,8 +82,12 @@ public enum Messages {
     }
 
     /// Silencio durante flujos críticos (onboarding, compra, grabando…). Lo que toque salir espera.
+    /// Al acabar se vuelven a pedir los mensajes: lo que cambió durante el flujo (terminar el
+    /// onboarding, hacerse Pro…) ya cuenta para la audiencia.
     public static func suppress(_ suppressed: Bool) {
+        let wasSuppressed = presenter.isSuppressed
         presenter.isSuppressed = suppressed
+        if wasSuppressed, !suppressed { Task { await runtime.refreshAndPresentNew() } }
     }
 
     /// Vuelve a pedir los mensajes (p. ej. tras hacerse Pro o terminar el onboarding). Lo nuevo

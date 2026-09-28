@@ -166,7 +166,12 @@ final class MessagesRuntime {
     func refresh(force: Bool) async {
         guard let config, let client else { return }
         if !force, let fetched = state.fetchedAt, Date.now.timeIntervalSince(fetched) < min(state.ttlSeconds, 300) { return }
-        if let running = refreshTask { await running.value; return }
+        // Una en marcha: sin `force` vale su resultado; con `force` se espera y se vuelve a pedir,
+        // porque la que estaba en marcha salió con los atributos de antes (p. ej. aún no era Pro).
+        while let running = refreshTask {
+            await running.value
+            if !force { return }
+        }
         let task = Task {
             let started = ContinuousClock.now
             let uid = await userId()
