@@ -18,27 +18,96 @@ public struct AppReport: Sendable, Hashable, Codable {
     public var attributes: [AppConfig.Attribute]
     public var sdkVersion: String
 
+    public init(
+        appId: String, bundleId: String, name: String, languages: [String], theme: ThemeSpec,
+        routes: [String], actions: [String], screens: [String], events: [String],
+        attributes: [AppConfig.Attribute], sdkVersion: String
+    ) {
+        self.appId = appId; self.bundleId = bundleId; self.name = name; self.languages = languages
+        self.theme = theme; self.routes = routes; self.actions = actions; self.screens = screens
+        self.events = events; self.attributes = attributes; self.sdkVersion = sdkVersion
+    }
+
+    /// Tolerante: lo que falte se queda vacío (y el tema, el de por defecto).
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = c.value(.kind, default: "messageskit.appReport")
+        appId = c.value(.appId, default: "")
+        bundleId = c.value(.bundleId, default: "")
+        name = c.value(.name, default: "")
+        languages = c.value(.languages, default: [])
+        theme = c.value(.theme, default: .init())
+        routes = c.value(.routes, default: [])
+        actions = c.value(.actions, default: [])
+        screens = c.value(.screens, default: [])
+        events = c.value(.events, default: [])
+        attributes = c.value(.attributes, default: [])
+        sdkVersion = c.value(.sdkVersion, default: "")
+    }
+
+    /// Lee lo que se pega en el admin: admite espacios alrededor, comillas tipográficas (al pasar
+    /// por Notas o un chat) y texto antes o después del JSON. `nil` si no es un informe de app.
+    public static func parse(_ text: String) -> AppReport? {
+        var t = text
+            .replacingOccurrences(of: "\u{201C}", with: "\"").replacingOccurrences(of: "\u{201D}", with: "\"")
+            .replacingOccurrences(of: "\u{2018}", with: "'").replacingOccurrences(of: "\u{2019}", with: "'")
+        if let start = t.firstIndex(of: "{"), let end = t.lastIndex(of: "}") { t = String(t[start...end]) }
+        guard let report = try? JSONDecoder.messages.decode(AppReport.self, from: Data(t.utf8)),
+              report.kind == "messageskit.appReport", !report.appId.trimmingCharacters(in: .whitespaces).isEmpty
+        else { return nil }
+        return report.cleaned()
+    }
+
+    /// Nombres limpios: sin espacios sobrantes, vacíos ni repetidos, y de 128 caracteres como
+    /// mucho (lo que admite el hub para pantallas y eventos).
+    public func cleaned() -> AppReport {
+        func names(_ list: [String]) -> [String] {
+            var seen = Set<String>()
+            return list.map { String($0.trimmingCharacters(in: .whitespacesAndNewlines).prefix(128)) }
+                .filter { !$0.isEmpty && seen.insert($0).inserted }
+        }
+        var out = self
+        out.appId = appId.trimmingCharacters(in: .whitespacesAndNewlines)
+        out.languages = names(languages)
+        out.routes = names(routes)
+        out.actions = names(actions)
+        out.screens = names(screens)
+        out.events = names(events)
+        var seen = Set<String>()
+        out.attributes = attributes.compactMap { a in
+            let n = String(a.name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(128))
+            guard !n.isEmpty, seen.insert(n).inserted else { return nil }
+            return .init(name: n, kind: a.kind, description: a.description)
+        }
+        return out
+    }
+
     /// Mezcla el informe en una app del admin: añade lo que falte y respeta lo ya escrito
-    /// (descripciones, parámetros). El tema se sustituye por el de la app.
+    /// (descripciones, parámetros y el tipo de los atributos que ya estaban). El tema se
+    /// sustituye por el de la app.
     public func merged(into app: AppConfig) -> AppConfig {
+        let r = cleaned()
         var out = app
-        if out.bundleId.isEmpty { out.bundleId = bundleId }
-        if out.name.isEmpty || out.name == out.appId { out.name = name }
-        for l in languages where !out.languages.contains(l) { out.languages.append(l) }
-        for r in routes where out.routes[r] == nil { out.routes[r] = .init() }
-        for a in actions where out.customActions[a] == nil { out.customActions[a] = .init() }
-        out.screens = Array(Set(out.screens).union(screens)).sorted()
-        out.events = Array(Set(out.events).union(events)).sorted()
-        for attr in attributes where !out.attributes.contains(where: { $0.name == attr.name }) {
+        if out.bundleId.isEmpty { out.bundleId = r.bundleId }
+        if out.name.isEmpty || out.name == out.appId { out.name = r.name.isEmpty ? out.appId : r.name }
+        for l in r.languages where !out.languages.contains(l) { out.languages.append(l) }
+        for route in r.routes where out.routes[route] == nil { out.routes[route] = .init() }
+        for a in r.actions where out.customActions[a] == nil { out.customActions[a] = .init() }
+        out.screens = Array(Set(out.screens).union(r.screens)).sorted()
+        out.events = Array(Set(out.events).union(r.events)).sorted()
+        for attr in r.attributes where !out.attributes.contains(where: { $0.name == attr.name }) {
             out.attributes.append(attr)
         }
-        out.theme = theme
+        out.theme = r.theme
         return out
     }
 
     /// Una app nueva del admin a partir del informe.
     public func makeApp() -> AppConfig {
-        merged(into: AppConfig(appId: appId, name: name, bundleId: bundleId, languages: languages, defaultLanguage: languages.first ?? "es"))
+        let r = cleaned()
+        let langs = r.languages.isEmpty ? ["es", "en"] : r.languages
+        return r.merged(into: AppConfig(appId: r.appId, name: r.name.isEmpty ? r.appId : r.name, bundleId: r.bundleId,
+                                        languages: langs, defaultLanguage: langs.first ?? "es"))
     }
 }
 
