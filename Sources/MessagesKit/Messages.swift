@@ -127,9 +127,10 @@ public enum Messages {
         runtime.handleNotification(userInfo)
     }
 
-    /// Pásale los avisos que llegan por detrás (`didReceiveRemoteNotification`). Si es de
-    /// MessagesKit, deja los mensajes pedidos para cuando se abra o se vuelva a la app, pero no
-    /// enseña nada ahora: nunca sale un mensaje a mitad de uso. `true` si era de MessagesKit.
+    /// Pásale los avisos que llegan por detrás (`didReceiveRemoteNotification`). El hub los manda
+    /// al crear, editar o pausar una campaña: se piden los mensajes, lo que ya no toca se quita
+    /// de la pantalla y lo nuevo queda listo para su siguiente disparador (no sale a mitad de
+    /// uso). `true` si era de MessagesKit.
     @discardableResult
     public static func didReceiveRemoteNotification(_ userInfo: [AnyHashable: Any]) async -> Bool {
         guard MessagesRuntime.isRefreshSignal(userInfo) else { return false }

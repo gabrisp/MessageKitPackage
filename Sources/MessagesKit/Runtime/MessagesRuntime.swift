@@ -399,9 +399,11 @@ final class MessagesRuntime {
 
     /// Mientras un mensaje está en pantalla, se mira cada poco (en local) si sigue tocando: si
     /// deja de cumplir la audiencia (se ha hecho Pro, ha actualizado…), se quita solo.
-    /// Con uno que no se puede cerrar en pantalla, cada cuánto se pregunta al hub (con etag, casi
-    /// gratis) por si lo has pausado: así desaparece aunque el usuario no salga de la app.
-    static let persistentRecheck: Duration = .seconds(60)
+    /// Con uno que no se puede cerrar en pantalla, cada cuánto se pregunta al hub por si lo has
+    /// pausado. Es solo el respaldo: lo normal es que llegue antes el push silencioso del hub
+    /// (campaigns-sync). Más un margen al azar, para que no pregunten todos los móviles a la vez.
+    static let persistentRecheck: Duration = .seconds(300)
+    static let persistentJitter = 0...90
     /// Igual, para una prueba que no se puede cerrar («Cortar prueba» en el admin): más a menudo.
     static let testRecheck: Duration = .seconds(20)
 
@@ -413,7 +415,7 @@ final class MessagesRuntime {
         let hasRules = !isTest && (a.rules != nil || a.developmentOnly == true)
         let persistent = !c.dismissible
         guard r.mode == .live, hasRules || persistent || (!isTest && c.schedule.endAt != nil) else { return }
-        let recheck = isTest ? Self.testRecheck : Self.persistentRecheck
+        let recheck = isTest ? Self.testRecheck : Self.persistentRecheck + .seconds(Int.random(in: Self.persistentJitter))
         watchTask = Task { [weak self] in
             var sinceHub: Duration = .zero
             while !Task.isCancelled {
