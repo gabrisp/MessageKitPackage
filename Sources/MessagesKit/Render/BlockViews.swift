@@ -393,7 +393,12 @@ public struct MessageButton: View {
             .id(button.style)
             .transition(.blurReplace)
             .animation(.smooth(duration: 0.35), value: button.style)
+            #if os(macOS)
+            // En el Mac «large» es mucho más bajo que en el iPhone: así se parecen.
+            .controlSize(.extraLarge)
+            #else
             .controlSize(.large)
+            #endif
             .fontDesign(theme.fontDesign)
             .buttonBorderShape(theme.buttonRadius.map { .roundedRectangle(radius: $0) } ?? .capsule)
             // Mientras hay algo en marcha no responde, pero sin cambiar de aspecto (nada de gris).
@@ -403,20 +408,22 @@ public struct MessageButton: View {
 
     private var label: some View {
         let loading = pressed && (handler?.isBusy ?? false)
-        return ZStack {
-            Group {
-                if let symbol = button.symbol {
-                    Label(button.title, systemImage: symbol)
-                } else {
-                    Text(button.title)
-                }
+        return Group {
+            if let symbol = button.symbol {
+                Label(button.title, systemImage: symbol)
+            } else {
+                Text(button.title)
             }
-            .contentTransition(.numericText())
-            .fontWeight(.semibold)
-            // El texto no se quita del todo: así el botón no cambia de tamaño.
-            .opacity(loading ? 0 : 1)
+        }
+        .contentTransition(.numericText())
+        .fontWeight(.semibold)
+        // El texto no se quita (solo se oculta) y la ruedita va encima, pequeña: el botón no
+        // cambia de tamaño al cargar.
+        .opacity(loading ? 0 : 1)
+        .overlay {
             if loading {
                 ProgressView()
+                    .controlSize(.small)
                     .tint(spinnerTint)
                     .accessibilityLabel(L.string("Cargando", "Loading"))
             }
