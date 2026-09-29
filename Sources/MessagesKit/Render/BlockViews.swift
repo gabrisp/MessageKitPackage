@@ -430,12 +430,14 @@ public struct MessageButton: View {
 
     @ViewBuilder private var styled: some View {
         switch button.style {
+        // Texto blanco fijo: si no, en algunos sitios (Mac, vista previa) el sistema lo pinta del
+        // color de acento sobre el propio acento y el botón parece otro.
         case .primary:
-            Button(action: tap) { label }
+            Button(action: tap) { label.foregroundStyle(.white) }
                 .messageButtonStyle(prominent: true)
                 .tint(theme.accent)
         case .destructive:
-            Button(action: tap) { label }
+            Button(action: tap) { label.foregroundStyle(.white) }
                 .messageButtonStyle(prominent: true)
                 .tint(theme.color("danger"))
         case .secondary:
