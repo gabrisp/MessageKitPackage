@@ -370,6 +370,8 @@ public struct MessageButton: View {
     var fillsWidth = true
     @Environment(\.messagesTheme) private var theme
     @Environment(\.messageActionHandler) private var handler
+    /// Para saber lo claro que es el color del botón en el modo actual (claro u oscuro).
+    @Environment(\.self) private var environment
     /// Este botón es el que ha lanzado la acción en marcha (enseña la ruedita).
     @State private var pressed = false
 
@@ -413,10 +415,31 @@ public struct MessageButton: View {
         .animation(.smooth(duration: 0.2), value: loading)
     }
 
+    /// El texto sobre un botón relleno: el token del tema si lo tiene (`onAccent`, `onDanger`); si
+    /// no, blanco o negro según lo claro que sea el color en el modo actual (el punto en el que
+    /// los dos contrastan igual, según WCAG).
+    private func onFill(_ fill: Color, token: String) -> Color {
+        if let custom = theme.colors[token] { return custom }
+        return Self.prefersDarkText(on: fill.resolve(in: environment)) ? .black : .white
+    }
+
+    /// Si sobre ese color se lee mejor el texto negro. Luminancia relativa (sRGB linealizado); el
+    /// umbral es más alto que el de WCAG (0,179), que pone negro sobre el azul o el rojo del sistema
+    /// donde Apple pone blanco: así azul, rojo, verde, naranja y violetas oscuros llevan blanco, y
+    /// amarillos, grises claros y colores pastel, negro.
+    static func prefersDarkText(on c: Color.Resolved) -> Bool {
+        func linear(_ v: Float) -> Double {
+            let x = Double(max(0, min(1, v)))
+            return x <= 0.04045 ? x / 12.92 : pow((x + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * linear(c.red) + 0.7152 * linear(c.green) + 0.0722 * linear(c.blue) > 0.45
+    }
+
     /// El color de la ruedita: el mismo que tendría el texto del botón.
     private var spinnerTint: Color {
         switch button.style {
-        case .primary, .destructive: .white
+        case .primary: onFill(theme.accent, token: "onAccent")
+        case .destructive: onFill(theme.color("danger"), token: "onDanger")
         case .secondary: theme.color("primaryText")
         case .glass, .link: theme.accent
         }
@@ -430,14 +453,14 @@ public struct MessageButton: View {
 
     @ViewBuilder private var styled: some View {
         switch button.style {
-        // Texto blanco fijo: si no, en algunos sitios (Mac, vista previa) el sistema lo pinta del
-        // color de acento sobre el propio acento y el botón parece otro.
+        // El texto, del color que contrasta con el del botón en este modo (no se deja al sistema:
+        // en algunos sitios lo pintaba del propio acento).
         case .primary:
-            Button(action: tap) { label.foregroundStyle(.white) }
+            Button(action: tap) { label.foregroundStyle(onFill(theme.accent, token: "onAccent")) }
                 .messageButtonStyle(prominent: true)
                 .tint(theme.accent)
         case .destructive:
-            Button(action: tap) { label.foregroundStyle(.white) }
+            Button(action: tap) { label.foregroundStyle(onFill(theme.color("danger"), token: "onDanger")) }
                 .messageButtonStyle(prominent: true)
                 .tint(theme.color("danger"))
         case .secondary:

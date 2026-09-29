@@ -98,6 +98,28 @@ struct AppReportTests {
         #expect(!stays.closes(messageDismissible: true))
     }
 
+    @Test("Texto de un botón relleno: negro sobre colores claros, blanco sobre oscuros (en cada modo)")
+    @MainActor
+    func buttonTextContrast() {
+        func resolved(_ hex: String, _ scheme: ColorScheme) -> Color.Resolved {
+            var env = EnvironmentValues()
+            env.colorScheme = scheme
+            return Color(lightHex: hex, darkHex: hex)!.resolve(in: env)
+        }
+        #expect(!MessageButton.prefersDarkText(on: resolved("#0A84FF", .light)), "Azul del sistema: blanco")
+        #expect(!MessageButton.prefersDarkText(on: resolved("#FF3B30", .dark)), "Rojo: blanco")
+        #expect(MessageButton.prefersDarkText(on: resolved("#FFD60A", .light)), "Amarillo: negro")
+        #expect(MessageButton.prefersDarkText(on: resolved("#E5E5EA", .dark)), "Gris muy claro: negro")
+        #expect(!MessageButton.prefersDarkText(on: resolved("#34C759", .light)), "Verde del sistema: blanco")
+        #expect(!MessageButton.prefersDarkText(on: resolved("#FF9500", .light)), "Naranja del sistema: blanco")
+        // Un acento que en oscuro se aclara: cambia de blanco a negro.
+        let accent = Color(lightHex: "#5E3BD9", darkHex: "#C9B8FF")!
+        var light = EnvironmentValues(); light.colorScheme = .light
+        var dark = EnvironmentValues(); dark.colorScheme = .dark
+        #expect(!MessageButton.prefersDarkText(on: accent.resolve(in: light)))
+        #expect(MessageButton.prefersDarkText(on: accent.resolve(in: dark)))
+    }
+
     @Test("Tipo de atributo deducido del valor")
     func inferredKinds() {
         #expect(AppConfig.Attribute.Kind.inferred(from: true) == .bool)
