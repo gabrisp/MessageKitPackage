@@ -94,10 +94,12 @@ struct MessagesLayerModifier: ViewModifier {
                     .id(request.id)
                 case .toast:
                     let p = request.campaign.presentation
+                    let h = ToastCapsule.placement(request.blocks).horizontal
                     ToastCapsule(blocks: request.blocks) { handler($0) }
                         .padding(.horizontal, 16)
                         .padding(.bottom, p.position == .bottom ? presenter.theme.bannerBottomInset : 0)
-                        .frame(maxHeight: .infinity, alignment: p.position == .top ? .top : .bottom)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity,
+                               alignment: Alignment(horizontal: h, vertical: p.position == .top ? .top : .bottom))
                         .messageEnvironment(request, theme: presenter.theme, handler: handler)
                         .modifier(OptionalColorScheme(scheme: request.variant.colorScheme))
                         .transition(.move(edge: p.position == .top ? .top : .bottom).combined(with: .opacity))

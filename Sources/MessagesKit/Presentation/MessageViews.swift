@@ -65,14 +65,16 @@ struct CompactParts {
     var title: String?
     var body: String?
     var button: Block.Button?
+    /// La alineación del titular (o del primer texto): la usan el toast y el banner.
+    var align: Block.Alignment?
 
     init(_ blocks: [Block]) {
         for b in blocks {
             switch b.kind {
             case .icon(let i) where icon == nil: icon = i
-            case .heading(let h) where title == nil: title = h.text
+            case .heading(let h) where title == nil: title = h.text; align = h.align
             case .text(let t):
-                if title == nil { title = t.text } else if body == nil { body = t.text }
+                if title == nil { title = t.text; align = t.align } else if body == nil { body = t.text }
             case .button(let btn) where button == nil: button = btn
             case .buttonRow(let row) where button == nil: button = row.buttons.first
             default: break
@@ -102,7 +104,9 @@ struct BannerCard: View {
                     .frame(width: 36)
                     .accessibilityHidden(true)
             }
-            VStack(alignment: .leading, spacing: 2) {
+            // La alineación del titular (o del primer texto) manda en todo el banner.
+            let align = parts.align ?? .leading
+            VStack(alignment: align.horizontal, spacing: 2) {
                 if let title = parts.title {
                     MarkdownText(title).font(.subheadline.weight(.semibold)).foregroundStyle(theme.color("primaryText"))
                 }
@@ -113,8 +117,9 @@ struct BannerCard: View {
                     Text(button.title).font(.footnote.weight(.semibold)).foregroundStyle(theme.accent).padding(.top, 2)
                 }
             }
+            .multilineTextAlignment(align.text)
             .fontDesign(theme.fontDesign)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: align.frame)
             .fixedSize(horizontal: false, vertical: true)
             if dismissible {
                 CloseButton { onClose(.closeButton) }
@@ -168,6 +173,7 @@ struct ToastCapsule: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(theme.color("primaryText"))
                     .lineLimit(2)
+                    .multilineTextAlignment((parts.align ?? .center).text)
             }
             if let button = parts.button {
                 Button { onAction(button.action) } label: {
@@ -324,5 +330,12 @@ struct OptionalColorScheme: ViewModifier {
         } else {
             content
         }
+    }
+}
+
+extension ToastCapsule {
+    /// Dónde va el toast en horizontal: según la alineación de su titular (por defecto, centrado).
+    static func placement(_ blocks: [Block]) -> Alignment {
+        (CompactParts(blocks).align ?? .center).frame
     }
 }

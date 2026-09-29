@@ -66,7 +66,8 @@ public struct MessageInlinePreview: View {
             ToastCapsule(blocks: blocks) { presenter.recordTestAction($0, campaign: campaign, language: language) }
                 .padding(.horizontal, 16)
                 .padding(.vertical, p.position == .top ? 54 : 90)
-                .frame(maxHeight: .infinity, alignment: p.position == .top ? .top : .bottom)
+                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                       alignment: Alignment(horizontal: ToastCapsule.placement(blocks).horizontal, vertical: p.position == .top ? .top : .bottom))
         case .sheet:
             InlineSheet(blocks: blocks, detent: p.detents.first ?? .large, dismissible: dismissible, onClose: close)
         case .fullscreen:
