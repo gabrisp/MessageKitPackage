@@ -25,6 +25,9 @@ final class StubHub: URLProtocol, @unchecked Sendable {
     override func stopLoading() {}
 }
 
+/// Lo que la app «dice» que es el usuario (cambia a mitad del test).
+nonisolated(unsafe) var testIsPro = false
+
 @Suite("Runtime", .serialized)
 @MainActor
 struct RuntimeTests {
@@ -47,5 +50,29 @@ struct RuntimeTests {
         await runtime.refresh(force: true)
         #expect(runtime.lastSync?.ok == true)
         #expect(StubHub.requests >= 2, "Con force se vuelve a pedir (\(StubHub.requests) peticiones)")
+    }
+
+    @Test("La audiencia se mira en el momento, sin pedir nada al hub: al hacerse Pro deja de tocar")
+    func audienceMatchesNow() async throws {
+        HubClient.testProtocolClasses = [StubHub.self]
+        defer { HubClient.testProtocolClasses = nil }
+        testIsPro = false
+        let runtime = MessagesRuntime(presenter: MessagePresenter())
+        runtime.configure(.init(
+            appId: "test-\(UUID().uuidString)", endpoint: URL(string: "https://hub.invalid/v1")!,
+            projectId: "p", publicKey: "k", userId: { "u" }, attributes: { ["isPro": testIsPro] }
+        ))
+        defer { runtime.resetLocalState() }
+        var forFree = Campaign(name: "Hazte Pro", appIds: ["test"])
+        forFree.audience = Audience(rules: .condition(.init(attr: "isPro", op: .neq, value: true)))
+        #expect(await runtime.matchesNow(forFree))
+        testIsPro = true
+        #expect(await !runtime.matchesNow(forFree), "Pro: ya no le toca, sin refresh")
+        // Sin reglas ni porcentaje: siempre (no hace falta mirar nada).
+        #expect(await runtime.matchesNow(Campaign(name: "Para todos", appIds: ["test"])))
+        // Solo desarrollo: los tests no son una build de desarrollo de una app.
+        var devOnly = Campaign(name: "Dev", appIds: ["test"])
+        devOnly.audience.developmentOnly = true
+        _ = await runtime.matchesNow(devOnly)
     }
 }

@@ -84,6 +84,10 @@ final class MessagesRuntime {
     private var capabilitiesTask: Task<Void, Never>?
     /// Las campañas que le siguen tocando (última respuesta del hub), para quitar la que ya no.
     private var activeIds: Set<String>?
+    /// Vigila en local la audiencia del mensaje que está en pantalla.
+    private var watchTask: Task<Void, Never>?
+    /// Cada cuánto se vuelve a mirar (en local, sin red) si el mensaje en pantalla sigue tocando.
+    static let watchInterval: Duration = .seconds(2)
 
     init(presenter: MessagePresenter) {
         self.presenter = presenter
@@ -336,6 +340,12 @@ final class MessagesRuntime {
                 self.pending[campaign.id] = nil
                 if case .screen(let s) = trigger, self.activeScreens[s] == nil { return }
                 guard self.isEligibleLocally(campaign, now: .now) else { return }
+                // La audiencia, con los datos de AHORA (p. ej. si ya es Pro), sin pedir nada al hub.
+                guard await self.matchesNow(campaign) else {
+                    MessagesLog.debug("«\(campaign.name)» ya no cumple la audiencia: no sale")
+                    return
+                }
+                guard !self.presenter.contains(campaignId: campaign.id) else { return }
                 self.presenter.enqueue(MessageRequest(campaign: campaign, language: self.language, mode: .live))
             }
         }
@@ -364,8 +374,40 @@ final class MessagesRuntime {
     /// ni en el hub (sus impresiones van con `actionId: "preview"`): probar no gasta la campaña real.
     private func isPreview(_ r: MessageRequest) -> Bool { r.campaign.forced == true }
 
+    // MARK: Audiencia en el momento
+
+    /// Si la campaña le sigue tocando con los atributos de ahora. Solo mira reglas, porcentaje y
+    /// «solo desarrollo»: los usuarios concretos ya los ha filtrado el hub (y no vienen).
+    func matchesNow(_ c: Campaign) async -> Bool {
+        var audience = c.audience
+        audience.userIds = []
+        guard audience.rules != nil || audience.percent < 100 || audience.developmentOnly == true else { return true }
+        let attrs = await attributes()
+        return Rules.audienceMatches(audience, userId: await userId(), campaignId: c.id, attributes: attrs)
+    }
+
+    /// Mientras un mensaje está en pantalla, se mira cada poco (en local) si sigue tocando: si
+    /// deja de cumplir la audiencia (se ha hecho Pro, ha actualizado…), se quita solo.
+    private func watch(_ r: MessageRequest) {
+        watchTask?.cancel()
+        let a = r.campaign.audience
+        guard r.mode == .live, r.campaign.forced != true, a.rules != nil || a.developmentOnly == true else { return }
+        watchTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: Self.watchInterval)
+                guard !Task.isCancelled, let self, self.presenter.current?.id == r.id else { return }
+                if await !self.matchesNow(r.campaign), self.presenter.current?.id == r.id {
+                    MessagesLog.debug("«\(r.campaign.name)» ya no le toca: se quita")
+                    self.presenter.dismiss(.programmatic, id: r.id)
+                    return
+                }
+            }
+        }
+    }
+
     private func didShow(_ r: MessageRequest) {
         let id = r.campaign.id
+        watch(r)
         state.forced.removeAll { $0.id == id }
         if isPreview(r) {
             record(.shown, r, actionId: Self.previewActionId)
