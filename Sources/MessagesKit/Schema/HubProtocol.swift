@@ -52,6 +52,9 @@ public struct MessagesResponse: Sendable, Codable {
     /// Las campañas que le siguen tocando a este usuario (sin contar frecuencia ni tope). Si la
     /// que está en pantalla ya no está, se quita. `nil` con un hub antiguo.
     public var active: [String]?
+    /// Las pruebas («Enviar prueba») que siguen en pie. Una en pantalla que ya no esté (cortada
+    /// desde el admin o caducada) se quita. `nil` con un hub antiguo.
+    public var tests: [String]?
 
     public init(campaigns: [Campaign] = [], dailyCap: Int = 0, serverTime: Date = .now, etag: String = "", ttlSeconds: Double = 300, notModified: Bool = false, blocked: String? = nil) {
         self.campaigns = campaigns; self.dailyCap = dailyCap; self.serverTime = serverTime
@@ -68,6 +71,7 @@ public struct MessagesResponse: Sendable, Codable {
         notModified = c.value(.notModified, default: false)
         blocked = try? c.decodeIfPresent(String.self, forKey: .blocked)
         active = try? c.decodeIfPresent([String].self, forKey: .active)
+        tests = try? c.decodeIfPresent([String].self, forKey: .tests)
     }
 }
 

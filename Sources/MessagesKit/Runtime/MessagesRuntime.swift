@@ -84,6 +84,8 @@ final class MessagesRuntime {
     private var capabilitiesTask: Task<Void, Never>?
     /// Las campañas que le siguen tocando (última respuesta del hub), para quitar la que ya no.
     private var activeIds: Set<String>?
+    /// Las pruebas en pie (última respuesta del hub), para quitar la que se ha cortado.
+    private var testIds: Set<String>?
     /// Vigila en local la audiencia del mensaje que está en pantalla.
     private var watchTask: Task<Void, Never>?
     /// Cada cuánto se vuelve a mirar (en local, sin red) si el mensaje en pantalla sigue tocando.
@@ -238,6 +240,12 @@ final class MessagesRuntime {
         state.fetchedAt = .now
         state.ttlSeconds = response.ttlSeconds
         state.dailyCap = response.dailyCap
+        if let tests = response.tests {
+            // Las pruebas cortadas desde el admin (o caducadas) se van, llegue lo que llegue.
+            testIds = Set(tests)
+            state.forced.removeAll { !tests.contains($0.id) }
+            removeNoLongerActive()
+        }
         if response.notModified {
             MessagesLog.debug("Sin cambios (etag \(response.etag))")
         } else {
@@ -257,12 +265,15 @@ final class MessagesRuntime {
     /// Lo que está en pantalla o esperando y ya no le toca (se ha hecho Pro, ya no cumple la
     /// audiencia, se ha pausado…) se quita. Las pruebas no: esas se ven hasta que se cierran.
     private func removeNoLongerActive() {
-        guard let activeIds else { return }
+        let activeIds = self.activeIds, testIds = self.testIds
+        guard activeIds != nil || testIds != nil else { return }
         func gone(_ r: MessageRequest) -> Bool {
-            r.mode == .live && r.campaign.forced != true && !activeIds.contains(r.campaign.id)
+            guard r.mode == .live else { return false }
+            if r.campaign.forced == true { return testIds.map { !$0.contains(r.campaign.id) } ?? false }
+            return activeIds.map { !$0.contains(r.campaign.id) } ?? false
         }
         presenter.removeQueued(where: gone)
-        for (id, task) in pending where !activeIds.contains(id) {
+        for (id, task) in pending where activeIds.map({ !$0.contains(id) }) ?? false {
             task.cancel()
             pending[id] = nil
         }
@@ -391,21 +402,26 @@ final class MessagesRuntime {
     /// Con uno que no se puede cerrar en pantalla, cada cuánto se pregunta al hub (con etag, casi
     /// gratis) por si lo has pausado: así desaparece aunque el usuario no salga de la app.
     static let persistentRecheck: Duration = .seconds(60)
+    /// Igual, para una prueba que no se puede cerrar («Cortar prueba» en el admin): más a menudo.
+    static let testRecheck: Duration = .seconds(20)
 
     private func watch(_ r: MessageRequest) {
         watchTask?.cancel()
         let c = r.campaign
         let a = c.audience
-        let hasRules = a.rules != nil || a.developmentOnly == true
+        let isTest = c.forced == true
+        let hasRules = !isTest && (a.rules != nil || a.developmentOnly == true)
         let persistent = !c.dismissible
-        guard r.mode == .live, c.forced != true, hasRules || persistent || c.schedule.endAt != nil else { return }
+        guard r.mode == .live, hasRules || persistent || (!isTest && c.schedule.endAt != nil) else { return }
+        let recheck = isTest ? Self.testRecheck : Self.persistentRecheck
         watchTask = Task { [weak self] in
             var sinceHub: Duration = .zero
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.watchInterval)
                 guard !Task.isCancelled, let self, self.presenter.current?.id == r.id else { return }
                 // En local: su calendario (p. ej. «bloquear hasta las 14:00») y su audiencia.
-                let scheduleOK = Rules.scheduleAllows(c.schedule, now: .now, userTimeZone: .current)
+                // (Una prueba se salta el calendario y la audiencia, como en el hub.)
+                let scheduleOK = isTest || Rules.scheduleAllows(c.schedule, now: .now, userTimeZone: .current)
                 let audienceOK = hasRules ? await self.matchesNow(c) : true
                 if !scheduleOK || !audienceOK {
                     guard self.presenter.current?.id == r.id else { return }
@@ -416,7 +432,7 @@ final class MessagesRuntime {
                 // Los que no se pueden cerrar: de vez en cuando, al hub (pausada, archivada…).
                 if persistent {
                     sinceHub += Self.watchInterval
-                    if sinceHub >= Self.persistentRecheck {
+                    if sinceHub >= recheck {
                         sinceHub = .zero
                         await self.refresh(force: true)
                     }

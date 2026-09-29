@@ -100,6 +100,8 @@ struct SystemActions {
 @Observable
 public final class MessagePresenter {
     public private(set) var current: MessageRequest?
+    /// En modo prueba, cuánto dura en pantalla uno que no se puede cerrar.
+    public static let testLockTimeout: Duration = .seconds(6)
     public private(set) var queue: [MessageRequest] = []
     /// La app pide silencio (onboarding, compra, grabando…).
     public var isSuppressed = false {
@@ -171,6 +173,13 @@ public final class MessagePresenter {
         }
         let next = queue.removeFirst()
         withAnimation(.spring(duration: 0.4, bounce: 0.18)) { current = next }
+        // En modo prueba (el admin) uno que no se puede cerrar no te deja atrapado: se va solo.
+        if next.mode == .test, !next.dismissible {
+            Task { [weak self] in
+                try? await Task.sleep(for: Self.testLockTimeout)
+                self?.dismiss(.programmatic, id: next.id)
+            }
+        }
         if next.mode == .live { onShown?(next) }
         if next.style == .toast || next.style == .banner {
             let text = next.blocks.compactMap(\.plainText).joined(separator: ". ")
