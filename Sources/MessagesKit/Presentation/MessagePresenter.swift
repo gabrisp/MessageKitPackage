@@ -155,6 +155,25 @@ public final class MessagePresenter {
         current?.campaign.id == campaignId || queue.contains { $0.campaign.id == campaignId }
     }
 
+    /// Una versión nueva de una campaña (la has editado y publicado): la que está en pantalla se
+    /// cambia en el sitio, sin cerrarse ni volver a animarse; si ha cambiado de tipo (alert → hoja…),
+    /// se cierra y sale la nueva. Las que esperan en la cola, también. `true` si estaba en pantalla.
+    @discardableResult
+    func update(campaign: Campaign) -> Bool {
+        for i in queue.indices where queue[i].campaign.id == campaign.id && queue[i].mode == .live {
+            queue[i].campaign = campaign
+        }
+        guard var shown = current, shown.mode == .live, shown.campaign.id == campaign.id, shown.campaign != campaign else { return false }
+        if shown.style == campaign.presentation.style {
+            shown.campaign = campaign
+            current = shown
+        } else {
+            dismiss(.programmatic, id: shown.id)
+            enqueue(MessageRequest(campaign: campaign, language: shown.language, mode: .live, variant: shown.variant, theme: shown.theme))
+        }
+        return true
+    }
+
     /// Quita de la cola (no de la pantalla) lo que cumpla la condición.
     public func removeQueued(where predicate: (MessageRequest) -> Bool) {
         queue.removeAll(where: predicate)

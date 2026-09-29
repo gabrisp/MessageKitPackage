@@ -214,7 +214,8 @@ final class MessagesRuntime {
                     capabilities: capabilities,
                     etag: state.campaigns.isEmpty || open != nil ? nil : state.etag,
                     sdkVersion: messagesKitVersion,
-                    open: open
+                    open: open,
+                    showing: presenter.current.flatMap { $0.mode == .live && $0.campaign.forced != true ? $0.campaign.id : nil }
                 )
                 let response = try await client.call("messages", request, as: MessagesResponse.self)
                 apply(response)
@@ -262,6 +263,13 @@ final class MessagesRuntime {
             if let active = response.active {
                 activeIds = Set(active)
                 removeNoLongerActive()
+            }
+            // Lo que está en pantalla (o esperando) pasa a su versión nueva si la has editado.
+            for c in state.campaigns where c.forced != true {
+                if presenter.update(campaign: c), let current = presenter.current, current.campaign.id == c.id {
+                    MessagesLog.debug("«\(c.name)» actualizada en pantalla")
+                    watch(current)
+                }
             }
         }
         scheduleSave()

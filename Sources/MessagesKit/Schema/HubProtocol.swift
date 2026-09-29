@@ -35,6 +35,8 @@ public struct MessagesRequest: Sendable, Codable {
     /// La campaña de un push que el usuario acaba de tocar: el hub la sirve aunque se haya
     /// llegado al tope o a la frecuencia.
     public var open: String? = nil
+    /// La que tiene en pantalla: el hub manda su versión actual aunque ya se viera.
+    public var showing: String? = nil
 }
 
 /// Respuesta de la función `messages`.
