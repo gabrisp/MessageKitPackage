@@ -707,6 +707,8 @@ final class MessagesRuntime {
         out["installDate"] = .string(ISO8601.string(from: install))
         out["daysSinceInstall"] = .number(Double(Calendar.current.dateComponents([.day], from: install, to: .now).day ?? 0))
         out["timezone"] = .string(TimeZone.current.identifier)
+        // Build de Xcode (desarrollo) o de TestFlight/App Store: para las campañas «solo desarrollo».
+        out["environment"] = .string(SystemBridge.isSandboxBuild ? "development" : "production")
         // Solo dentro de una app: fuera de un bundle `.app` (tests, herramientas) el centro de avisos rompe.
         if Bundle.main.bundleURL.pathExtension == "app" {
             let settings = await UNUserNotificationCenter.current().notificationSettings()

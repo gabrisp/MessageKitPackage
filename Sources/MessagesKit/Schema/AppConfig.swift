@@ -95,6 +95,7 @@ public struct AppConfig: Sendable, Hashable, Codable, Identifiable {
             .init(name: "pushAuthorized", kind: .bool, description: "Avisos permitidos"),
             .init(name: "onboardingCompleted", kind: .bool, description: "Onboarding terminado (lo manda la app)"),
             .init(name: "timezone", kind: .string, description: "Zona horaria (Europe/Madrid…)"),
+            .init(name: "environment", kind: .string, description: "development (build de Xcode) o production"),
         ]
     }
 

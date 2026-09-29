@@ -27,6 +27,8 @@ public struct Campaign: Sendable, Hashable, Codable, Identifiable {
     public var push: PushSpec?
     public var schemaVersion: Int
     public var createdBy: String?
+    /// Carpeta en el admin (p. ej. «Onboarding», «Pro»). Las apps no la usan.
+    public var group: String?
     public var updatedAt: Date?
     /// Solo en respuestas del hub: campaña forzada con "Enviar a un usuario"
     /// (se salta audiencia y frecuencia, y sale en el siguiente disparo).
@@ -101,7 +103,7 @@ public struct Campaign: Sendable, Hashable, Codable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case id, name, appIds, status, priority, presentation, dismissible, defaultLanguage, content
-        case trigger, audience, schedule, frequency, push, schemaVersion, createdBy, updatedAt, forced
+        case trigger, audience, schedule, frequency, push, schemaVersion, createdBy, group, updatedAt, forced
     }
 
     public init(from decoder: Decoder) throws {
@@ -123,6 +125,7 @@ public struct Campaign: Sendable, Hashable, Codable, Identifiable {
         push = c.optional(.push)
         schemaVersion = c.value(.schemaVersion, default: messagesSchemaVersion)
         createdBy = c.optional(.createdBy)
+        group = (c.optional(.group) as String?).flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
         updatedAt = c.optional(.updatedAt)
         forced = c.optional(.forced)
     }
@@ -259,15 +262,19 @@ public struct Audience: Sendable, Hashable, Codable {
     /// 0…100. Despliegue parcial estable con un hash de `userId + campaignId`.
     public var percent: Double
     public var rules: RuleNode?
+    /// Solo builds de desarrollo (las de Xcode): para probar una campaña de verdad en tu móvil sin
+    /// que la vea nadie. `nil` = todos. La app manda `environment` (`development`/`production`).
+    public var developmentOnly: Bool?
 
-    public init(userIds: [String] = [], percent: Double = 100, rules: RuleNode? = nil) {
-        self.userIds = userIds; self.percent = percent; self.rules = rules
+    public init(userIds: [String] = [], percent: Double = 100, rules: RuleNode? = nil, developmentOnly: Bool? = nil) {
+        self.userIds = userIds; self.percent = percent; self.rules = rules; self.developmentOnly = developmentOnly
     }
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         userIds = c.value(.userIds, default: [])
         percent = c.value(.percent, default: 100)
+        developmentOnly = (c.optional(.developmentOnly) as Bool?) == true ? true : nil
         // Unas reglas que no se entienden no pueden abrir la campaña a todo el mundo:
         // si vienen pero no se decodifican, no le sale a nadie.
         if c.contains(.rules), (try? c.decodeNil(forKey: .rules)) != true {

@@ -81,6 +81,7 @@ public enum Rules {
     /// `attributes` es el diccionario plano que manda la app; los propios pueden ir
     /// en `attributes["custom"]` (se buscan ahí si no están arriba).
     public static func audienceMatches(_ a: Audience, userId: String, campaignId: String, attributes: [String: JSONValue]) -> Bool {
+        if a.developmentOnly == true, attributes["environment"] != .string("development") { return false }
         if !a.userIds.isEmpty, !a.userIds.contains(userId) { return false }
         if let rules = a.rules, !evaluate(rules, attributes) { return false }
         return inRollout(percent: a.percent, userId: userId, campaignId: campaignId)
