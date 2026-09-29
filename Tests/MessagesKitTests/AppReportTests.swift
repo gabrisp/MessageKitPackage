@@ -120,6 +120,21 @@ struct AppReportTests {
         #expect(MessageButton.prefersDarkText(on: accent.resolve(in: dark)))
     }
 
+    @Test("Qué bloques se ven en toast, banner y alert")
+    func visibleBlocksPerStyle() {
+        let blocks = [
+            Block(.icon(.init(symbol: "star"))), Block(.heading(.init(text: "Título"))),
+            Block(.text(.init(text: "Texto"))), Block(.text(.init(text: "Otro"))),
+            Block(.image(.init(url: "https://x"))), Block(.button(.init(title: "Vale", action: .dismiss))),
+        ]
+        let ids = blocks.map(\.id)
+        #expect(Presentation.Style.toast.visibleBlockIds(blocks) == [ids[0], ids[1], ids[5]])
+        #expect(Presentation.Style.banner.visibleBlockIds(blocks) == [ids[0], ids[1], ids[2], ids[5]])
+        #expect(Presentation.Style.sheet.visibleBlockIds(blocks).count == 6)
+        let many = (0..<12).map { Block(.text(.init(text: "\($0)"))) }
+        #expect(Presentation.Style.alert.visibleBlockIds(many).count == 10)
+    }
+
     @Test("Tipo de atributo deducido del valor")
     func inferredKinds() {
         #expect(AppConfig.Attribute.Kind.inferred(from: true) == .bool)

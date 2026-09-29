@@ -49,6 +49,16 @@ public enum CampaignValidator {
             }
         }
 
+        // Bloques que esta presentación no pinta (el toast y el banner compactan; el alert tiene tope).
+        let style = c.presentation.style
+        for (lang, blocks) in c.content where !blocks.isEmpty {
+            let hidden = blocks.count - style.visibleBlockIds(blocks).count
+            if hidden > 0, let note = style.blocksNote {
+                warning(L.string("\(note) En \(lang) hay \(hidden) bloque\(hidden == 1 ? "" : "s") que no se verá\(hidden == 1 ? "" : "n").",
+                                 "\(note) In \(lang), \(hidden) block\(hidden == 1 ? "" : "s") won't show."))
+            }
+        }
+
         // No dismisseable: tiene que haber una salida.
         if !c.dismissible {
             let actions = defaultBlocks.flatMap(\.actions)

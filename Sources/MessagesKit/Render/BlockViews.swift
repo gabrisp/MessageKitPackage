@@ -89,10 +89,13 @@ public struct BlocksView: View {
     public var body: some View {
         VStack(spacing: spacing) {
             ForEach(blocks) { block in
+                // Un bloque que entra, sale o cambia de tipo: con desenfoque, no de golpe.
                 BlockView(block: block)
+                    .transition(.blurReplace)
             }
         }
         .frame(maxWidth: .infinity)
+        .animation(.smooth(duration: 0.35), value: blocks)
     }
 }
 
@@ -184,6 +187,8 @@ struct MarkdownText: View {
 
     var body: some View {
         Text(attributed)
+            // Al actualizarse (campaña editada con el mensaje en pantalla), el texto cambia letra a letra.
+            .contentTransition(.numericText())
             .tint(theme.accent)
             .environment(\.openURL, OpenURLAction { url in
                 handler?(MessageAction(.openURL(url: url.absoluteString, inApp: true), thenDismiss: false, trackAs: "link"))
@@ -401,6 +406,7 @@ public struct MessageButton: View {
                     Text(button.title)
                 }
             }
+            .contentTransition(.numericText())
             .fontWeight(.semibold)
             // El texto no se quita del todo: así el botón no cambia de tamaño.
             .opacity(loading ? 0 : 1)

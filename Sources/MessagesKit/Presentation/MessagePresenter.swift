@@ -166,7 +166,8 @@ public final class MessagePresenter {
         guard var shown = current, shown.mode == .live, shown.campaign.id == campaign.id, shown.campaign != campaign else { return false }
         if shown.style == campaign.presentation.style {
             shown.campaign = campaign
-            current = shown
+            // Textos que cambian letra a letra y bloques con desenfoque (ver BlocksView).
+            withAnimation(.smooth(duration: 0.35)) { current = shown }
         } else {
             dismiss(.programmatic, id: shown.id)
             enqueue(MessageRequest(campaign: campaign, language: shown.language, mode: .live, variant: shown.variant, theme: shown.theme))
