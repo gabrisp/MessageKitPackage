@@ -91,8 +91,7 @@ final class MessagesRuntime {
     private var testIds: Set<String>?
     /// Vigila en local la audiencia del mensaje que está en pantalla.
     private var watchTask: Task<Void, Never>?
-    /// Cada cuánto se vuelve a mirar (en local, sin red) si el mensaje en pantalla sigue tocando.
-    static let watchInterval: Duration = .seconds(2)
+
 
     init(presenter: MessagePresenter) {
         self.presenter = presenter
@@ -410,49 +409,17 @@ final class MessagesRuntime {
         return Rules.audienceMatches(audience, userId: await userId(), campaignId: c.id, attributes: attrs)
     }
 
-    /// Mientras un mensaje está en pantalla, se mira cada poco (en local) si sigue tocando: si
-    /// deja de cumplir la audiencia (se ha hecho Pro, ha actualizado…), se quita solo.
-    /// Con uno que no se puede cerrar en pantalla, cada cuánto se pregunta al hub por si lo has
-    /// pausado. Es solo el respaldo: lo normal es que llegue antes el push silencioso del hub
-    /// (campaigns-sync). Más un margen al azar, para que no pregunten todos los móviles a la vez.
-    static let persistentRecheck: Duration = .seconds(300)
-    static let persistentJitter = 0...90
-    /// Igual, para una prueba que no se puede cerrar («Cortar prueba» en el admin): más a menudo.
-    static let testRecheck: Duration = .seconds(20)
-
+    /// Mientras un mensaje está en pantalla no se comprueba nada de continuo (ligero): lo quitan
+    /// el aviso silencioso del hub, pedir los mensajes al volver a la app, `Messages.refresh()` o un
+    /// botón «Comprobar de nuevo». Solo si tiene fecha de fin, un temporizador lo quita a esa hora.
     private func watch(_ r: MessageRequest) {
         watchTask?.cancel()
-        let c = r.campaign
-        let a = c.audience
-        let isTest = c.forced == true
-        let hasRules = !isTest && (a.rules != nil || a.developmentOnly == true)
-        let persistent = !c.dismissible
-        guard r.mode == .live, hasRules || persistent || (!isTest && c.schedule.endAt != nil) else { return }
-        let recheck = isTest ? Self.testRecheck : Self.persistentRecheck + .seconds(Int.random(in: Self.persistentJitter))
+        guard r.mode == .live, r.campaign.forced != true, let end = r.campaign.schedule.endAt, end > .now else { return }
         watchTask = Task { [weak self] in
-            var sinceHub: Duration = .zero
-            while !Task.isCancelled {
-                try? await Task.sleep(for: Self.watchInterval)
-                guard !Task.isCancelled, let self, self.presenter.current?.id == r.id else { return }
-                // En local: su calendario (p. ej. «bloquear hasta las 14:00») y su audiencia.
-                // (Una prueba se salta el calendario y la audiencia, como en el hub.)
-                let scheduleOK = isTest || Rules.scheduleAllows(c.schedule, now: .now, userTimeZone: .current)
-                let audienceOK = hasRules ? await self.matchesNow(c) : true
-                if !scheduleOK || !audienceOK {
-                    guard self.presenter.current?.id == r.id else { return }
-                    MessagesLog.debug("«\(c.name)» ya no toca (\(scheduleOK ? "audiencia" : "calendario")): se quita")
-                    self.presenter.dismiss(.programmatic, id: r.id)
-                    return
-                }
-                // Los que no se pueden cerrar: de vez en cuando, al hub (pausada, archivada…).
-                if persistent {
-                    sinceHub += Self.watchInterval
-                    if sinceHub >= recheck {
-                        sinceHub = .zero
-                        await self.refresh(force: true)
-                    }
-                }
-            }
+            try? await Task.sleep(for: .seconds(end.timeIntervalSinceNow))
+            guard !Task.isCancelled, let self, self.presenter.current?.id == r.id else { return }
+            MessagesLog.debug("«\(r.campaign.name)» ha llegado a su fecha de fin: se quita")
+            self.presenter.dismiss(.programmatic, id: r.id)
         }
     }
 
@@ -627,6 +594,13 @@ final class MessagesRuntime {
             }
         case .track(let event, let properties):
             config?.analytics?(event, properties.mapValues { $0.anySendable })
+        case .refresh:
+            // Con la ruedita en el botón mientras pregunta; si ya no le toca, se quita solo.
+            if let r { presenter.setBusy(true, requestId: r.id) }
+            Task {
+                defer { if let r { self.presenter.setBusy(false, requestId: r.id) } }
+                await self.refreshAndPresentNew()
+            }
         }
     }
 

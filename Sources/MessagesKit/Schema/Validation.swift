@@ -55,11 +55,11 @@ public enum CampaignValidator {
             if actions.isEmpty {
                 // Vale (p. ej. bloquear la app unas horas): se quita al pausarla, al llegar su fecha
                 // de fin o cuando el usuario deja de cumplir la audiencia.
-                warning(L.string("Sin botones: el usuario no puede hacer nada. Se quita cuando la pausas (al momento con el aviso silencioso; como mucho en unos minutos), al llegar su fecha de fin o si deja de cumplir la audiencia.",
-                                 "No buttons: the user can't do anything. It goes away when you pause it (right away via the silent push; within a few minutes at most), at its end date, or if the user leaves the audience."))
+                warning(L.string("Sin botones: el usuario no puede hacer nada. Se quita al pausarla (con el aviso silencioso), al abrir o volver a la app, al llegar su fecha de fin o si deja de cumplir la audiencia. Un botón «Comprobar de nuevo» le da una salida por si el aviso no llega.",
+                                 "No buttons: the user can't do anything. It goes away when you pause it (silent push), when the app is opened or brought back, at its end date, or if the user leaves the audience. A “Check again” button gives them a way out if the push doesn't arrive."))
             } else if !actions.contains(where: { $0.closes(messageDismissible: false) }) {
-                warning(L.string("Ningún botón la cierra: se queda en pantalla hasta que el usuario deje de estar en la audiencia (p. ej. al hacerse Pro) o la pauses. Si quieres que un botón la cierre, en «Después» elige «Cierra el mensaje».",
-                                 "No button closes it: it stays on screen until the user leaves the audience (e.g. goes Pro) or you pause it. To let a button close it, set “Then” to “Close the message”."))
+                warning(L.string("Ningún botón la cierra: se queda en pantalla hasta que el usuario deje de estar en la audiencia (p. ej. al hacerse Pro) o la pauses. Si quieres que un botón la cierre, activa «Cerrar el mensaje al pulsar» en ese botón.",
+                                 "No button closes it: it stays on screen until the user leaves the audience (e.g. goes Pro) or you pause it. To let a button close it, turn on “Close the message on tap” for it."))
             }
             if c.presentation.style == .toast {
                 error(L.string("Un toast siempre se va solo: no puede ser no dismisseable.", "A toast always goes away on its own: it can't be non-dismissible."))

@@ -36,6 +36,8 @@ public enum ActionDescriber {
             let what = [offering.map { "offering «\($0)»" }, package.map { "paquete «\($0)»" }, product.map { "producto «\($0)»" }].compactMap { $0 }.joined(separator: ", ")
             let whatEn = [offering.map { "offering “\($0)”" }, package.map { "package “\($0)”" }, product.map { "product “\($0)”" }].compactMap { $0 }.joined(separator: ", ")
             base = t("Abriría la compra de Apple (\(what))", "Would open Apple's purchase sheet (\(whatEn))")
+        case .refresh:
+            base = t("Comprobaría con el hub si le sigue tocando (y lo quitaría si ya no)", "Would check with the hub if it still applies (and remove it if not)")
         case .unknown(let type, _):
             return t("Acción desconocida «\(type)»: no haría nada", "Unknown action “\(type)”: would do nothing")
         }

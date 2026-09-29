@@ -28,6 +28,9 @@ public struct MessageAction: Sendable, Hashable, Codable {
         /// Compra dentro de la app con la hoja de Apple. Con RevenueCat: `offering` + `packageId`
         /// (lo resuelve el manejador de `Messages.register(purchase:)`); sin él, StoreKit con `productId`.
         case purchase(productId: String?, offering: String?, packageId: String?)
+        /// Vuelve a pedir los mensajes al hub y quita el mensaje si ya no le toca. Una salida para un
+        /// mensaje que no se puede cerrar (p. ej. «Ya he actualizado» o «Comprobar de nuevo»).
+        case refresh
         /// Una acción que esta versión no conoce. Se conserva para no perderla al reescribir.
         case unknown(type: String, raw: JSONValue)
     }
@@ -58,13 +61,14 @@ public struct MessageAction: Sendable, Hashable, Codable {
         case .track: "track"
         case .custom: "custom"
         case .purchase: "purchase"
+        case .refresh: "refresh"
         case .unknown(let type, _): type
         }
     }
 
     public static let allTypes = [
         "dismiss", "route", "deepLink", "openURL", "requestReview", "requestPushPermission",
-        "share", "copy", "openCampaign", "track", "custom", "purchase",
+        "share", "copy", "openCampaign", "track", "custom", "purchase", "refresh",
     ]
 
     /// Si tras la acción se cierra el mensaje (explícito o por defecto del tipo).
@@ -72,7 +76,7 @@ public struct MessageAction: Sendable, Hashable, Codable {
         if case .dismiss = kind { return true }
         if let thenDismiss { return thenDismiss }
         switch kind {
-        case .copy, .track, .share, .unknown: return false
+        case .copy, .track, .share, .unknown, .refresh: return false
         default: return true
         }
     }
@@ -125,6 +129,7 @@ public struct MessageAction: Sendable, Hashable, Codable {
         case "openCampaign": kind = .openCampaign(campaignId: c.value(.campaignId, default: ""))
         case "track": kind = .track(event: c.value(.event, default: ""), properties: c.value(.properties, default: [:]))
         case "custom": kind = .custom(name: c.value(.name, default: ""), payload: c.value(.payload, default: .null))
+        case "refresh": kind = .refresh
         case "purchase": kind = .purchase(productId: c.optional(.productId), offering: c.optional(.offering), packageId: c.optional(.package))
         default: kind = .unknown(type: type, raw: (try? JSONValue(from: decoder)) ?? .null)
         }
@@ -140,7 +145,7 @@ public struct MessageAction: Sendable, Hashable, Codable {
         try c.encodeIfPresent(thenDismiss, forKey: .thenDismiss)
         try c.encodeIfPresent(trackAs, forKey: .trackAs)
         switch kind {
-        case .dismiss, .requestReview, .requestPushPermission, .unknown: break
+        case .dismiss, .requestReview, .requestPushPermission, .unknown, .refresh: break
         case .route(let name, let params):
             try c.encode(name, forKey: .name)
             if !params.isEmpty { try c.encode(params, forKey: .params) }

@@ -12,7 +12,7 @@ public struct Capabilities: Sendable, Hashable, Codable {
     /// uno que la app no tenga, para no dejar botones muertos en versiones antiguas).
     public var features: [String]
 
-    public static let supportedFeatures = ["purchase"]
+    public static let supportedFeatures = ["purchase", "refresh"]
 
     public init(routes: [String], actions: [String], blocksVersion: Int = messagesBlocksVersion, schemaVersion: Int = messagesSchemaVersion, features: [String] = Capabilities.supportedFeatures) {
         self.routes = routes; self.actions = actions
