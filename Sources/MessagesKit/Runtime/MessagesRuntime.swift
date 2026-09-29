@@ -506,11 +506,11 @@ final class MessagesRuntime {
             && (r?.style == .sheet || r?.style == .fullscreen)
         Task {
             if waits { try? await Task.sleep(for: .milliseconds(550)) }
-            execute(action)
+            execute(action, from: r)
         }
     }
 
-    private func execute(_ action: MessageAction) {
+    private func execute(_ action: MessageAction, from r: MessageRequest? = nil) {
         switch action.kind {
         case .dismiss, .unknown:
             break
@@ -520,7 +520,10 @@ final class MessagesRuntime {
             if let handler = customActions[name] { handler(payload) } else { MessagesLog.error("Acción no registrada: \(name)") }
         case .purchase(let productId, let offering, let packageId):
             let request = PurchaseRequest(productId: productId, offering: offering, packageId: packageId)
+            // Mientras compra, los botones del mensaje no responden (no hay dos compras a la vez).
+            if let r { presenter.setBusy(true, requestId: r.id) }
             Task {
+                defer { if let r { self.presenter.setBusy(false, requestId: r.id) } }
                 let outcome: PurchaseOutcome
                 if let purchaseHandler {
                     do { outcome = try await purchaseHandler(request) } catch {
@@ -544,7 +547,9 @@ final class MessagesRuntime {
         case .requestReview:
             presenter.system.requestReview?()
         case .requestPushPermission:
+            if let r { presenter.setBusy(true, requestId: r.id) }
             Task {
+                defer { if let r { self.presenter.setBusy(false, requestId: r.id) } }
                 let granted = (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])) ?? false
                 if granted { SystemBridge.registerForRemoteNotifications() }
                 config?.analytics?("message_push_permission", ["granted": granted])

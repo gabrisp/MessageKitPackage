@@ -8,12 +8,18 @@ import WebKit
 @MainActor
 public final class MessageActionHandler {
     let perform: @MainActor (MessageAction) -> Void
+    /// Si el mensaje tiene una acción en marcha (una compra…): sus botones no responden.
+    /// Se lee desde el presentador (observable), así que la vista se actualiza sola.
+    let busy: @MainActor () -> Bool
 
-    public init(_ perform: @escaping @MainActor (MessageAction) -> Void) {
+    public init(_ perform: @escaping @MainActor (MessageAction) -> Void, busy: @escaping @MainActor () -> Bool = { false }) {
         self.perform = perform
+        self.busy = busy
     }
 
     public func callAsFunction(_ action: MessageAction) { perform(action) }
+
+    @MainActor public var isBusy: Bool { busy() }
 }
 
 /// Dónde se está pintando el contenido: cambia la alineación por defecto y el espaciado.
@@ -364,6 +370,8 @@ public struct MessageButton: View {
     var fillsWidth = true
     @Environment(\.messagesTheme) private var theme
     @Environment(\.messageActionHandler) private var handler
+    /// Este botón es el que ha lanzado la acción en marcha (enseña la ruedita).
+    @State private var pressed = false
 
     public init(button: Block.Button, fillsWidth: Bool = true) {
         self.button = button
@@ -371,26 +379,54 @@ public struct MessageButton: View {
     }
 
     public var body: some View {
+        let busy = handler?.isBusy ?? false
         styled
             .controlSize(.large)
             .fontDesign(theme.fontDesign)
             .buttonBorderShape(theme.buttonRadius.map { .roundedRectangle(radius: $0) } ?? .capsule)
+            // Mientras hay algo en marcha no responde, pero sin cambiar de aspecto (nada de gris).
+            .allowsHitTesting(!busy)
+            .onChange(of: busy) { _, now in if !now { pressed = false } }
     }
 
     private var label: some View {
-        Group {
-            if let symbol = button.symbol {
-                Label(button.title, systemImage: symbol)
-            } else {
-                Text(button.title)
+        let loading = pressed && (handler?.isBusy ?? false)
+        return ZStack {
+            Group {
+                if let symbol = button.symbol {
+                    Label(button.title, systemImage: symbol)
+                } else {
+                    Text(button.title)
+                }
+            }
+            .fontWeight(.semibold)
+            // El texto no se quita del todo: así el botón no cambia de tamaño.
+            .opacity(loading ? 0 : 1)
+            if loading {
+                ProgressView()
+                    .tint(spinnerTint)
+                    .accessibilityLabel(L.string("Cargando", "Loading"))
             }
         }
-        .fontWeight(.semibold)
         .frame(maxWidth: fillsWidth && button.style != .link ? .infinity : nil)
         .contentShape(.rect)
+        .animation(.smooth(duration: 0.2), value: loading)
     }
 
-    private func tap() { handler?(button.action) }
+    /// El color de la ruedita: el mismo que tendría el texto del botón.
+    private var spinnerTint: Color {
+        switch button.style {
+        case .primary, .destructive: .white
+        case .secondary: theme.color("primaryText")
+        case .glass, .link: theme.accent
+        }
+    }
+
+    private func tap() {
+        guard handler?.isBusy != true else { return }
+        pressed = true
+        handler?(button.action)
+    }
 
     @ViewBuilder private var styled: some View {
         switch button.style {

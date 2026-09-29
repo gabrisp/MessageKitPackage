@@ -127,6 +127,10 @@ public final class MessagePresenter {
     var onLiveAction: (@MainActor (MessageRequest, MessageAction) -> Void)?
 
     var system = SystemActions()
+    /// Mensajes con una acción en marcha (compra, permiso de avisos…): sus botones no responden.
+    public internal(set) var busyRequestIds: Set<UUID> = []
+    /// Último toque por mensaje: un segundo toque muy seguido se ignora (no abrir dos veces).
+    @ObservationIgnored private var lastTap: [UUID: ContinuousClock.Instant] = [:]
     @ObservationIgnored private var retryTask: Task<Void, Never>?
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
 
@@ -195,7 +199,16 @@ public final class MessagePresenter {
     // MARK: Acciones
 
     /// Lo llama cada botón (a través de `MessageActionHandler`).
+    func setBusy(_ busy: Bool, requestId: UUID) {
+        if busy { busyRequestIds.insert(requestId) } else { busyRequestIds.remove(requestId) }
+    }
+
     func handle(_ action: MessageAction, from request: MessageRequest) {
+        // Con algo en marcha, nada; y dos toques en menos de medio segundo cuentan como uno.
+        guard !busyRequestIds.contains(request.id) else { return }
+        let now = ContinuousClock.now
+        if let last = lastTap[request.id], now - last < .milliseconds(500) { return }
+        lastTap[request.id] = now
         switch request.mode {
         case .live:
             onLiveAction?(request, action)
@@ -219,7 +232,10 @@ public final class MessagePresenter {
     }
 
     func handler(for request: MessageRequest) -> MessageActionHandler {
-        MessageActionHandler { [weak self] action in self?.handle(action, from: request) }
+        MessageActionHandler(
+            { [weak self] action in self?.handle(action, from: request) },
+            busy: { [weak self] in self?.busyRequestIds.contains(request.id) ?? false }
+        )
     }
 
     public func clearTestLog() { testLog.removeAll() }
