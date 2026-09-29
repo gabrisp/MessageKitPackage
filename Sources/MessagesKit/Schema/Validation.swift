@@ -53,7 +53,10 @@ public enum CampaignValidator {
         if !c.dismissible {
             let actions = defaultBlocks.flatMap(\.actions)
             if actions.isEmpty {
-                error(L.string("Una campaña que no se puede cerrar necesita al menos un botón.", "A non-dismissible campaign needs at least one button."))
+                // Vale (p. ej. bloquear la app unas horas): se quita al pausarla, al llegar su fecha
+                // de fin o cuando el usuario deja de cumplir la audiencia.
+                warning(L.string("Sin botones: el usuario no puede hacer nada. Se quita cuando la pausas (en como mucho un minuto), al llegar su fecha de fin o si deja de cumplir la audiencia.",
+                                 "No buttons: the user can't do anything. It goes away when you pause it (within a minute), at its end date, or if the user leaves the audience."))
             } else if !actions.contains(where: { $0.closes(messageDismissible: false) }) {
                 warning(L.string("Ningún botón la cierra: se queda en pantalla hasta que el usuario deje de estar en la audiencia (p. ej. al hacerse Pro) o la pauses. Si quieres que un botón la cierre, en «Después» elige «Cierra el mensaje».",
                                  "No button closes it: it stays on screen until the user leaves the audience (e.g. goes Pro) or you pause it. To let a button close it, set “Then” to “Close the message”."))

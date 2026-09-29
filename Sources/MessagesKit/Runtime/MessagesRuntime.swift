@@ -388,18 +388,38 @@ final class MessagesRuntime {
 
     /// Mientras un mensaje está en pantalla, se mira cada poco (en local) si sigue tocando: si
     /// deja de cumplir la audiencia (se ha hecho Pro, ha actualizado…), se quita solo.
+    /// Con uno que no se puede cerrar en pantalla, cada cuánto se pregunta al hub (con etag, casi
+    /// gratis) por si lo has pausado: así desaparece aunque el usuario no salga de la app.
+    static let persistentRecheck: Duration = .seconds(60)
+
     private func watch(_ r: MessageRequest) {
         watchTask?.cancel()
-        let a = r.campaign.audience
-        guard r.mode == .live, r.campaign.forced != true, a.rules != nil || a.developmentOnly == true else { return }
+        let c = r.campaign
+        let a = c.audience
+        let hasRules = a.rules != nil || a.developmentOnly == true
+        let persistent = !c.dismissible
+        guard r.mode == .live, c.forced != true, hasRules || persistent || c.schedule.endAt != nil else { return }
         watchTask = Task { [weak self] in
+            var sinceHub: Duration = .zero
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.watchInterval)
                 guard !Task.isCancelled, let self, self.presenter.current?.id == r.id else { return }
-                if await !self.matchesNow(r.campaign), self.presenter.current?.id == r.id {
-                    MessagesLog.debug("«\(r.campaign.name)» ya no le toca: se quita")
+                // En local: su calendario (p. ej. «bloquear hasta las 14:00») y su audiencia.
+                let scheduleOK = Rules.scheduleAllows(c.schedule, now: .now, userTimeZone: .current)
+                let audienceOK = hasRules ? await self.matchesNow(c) : true
+                if !scheduleOK || !audienceOK {
+                    guard self.presenter.current?.id == r.id else { return }
+                    MessagesLog.debug("«\(c.name)» ya no toca (\(scheduleOK ? "audiencia" : "calendario")): se quita")
                     self.presenter.dismiss(.programmatic, id: r.id)
                     return
+                }
+                // Los que no se pueden cerrar: de vez en cuando, al hub (pausada, archivada…).
+                if persistent {
+                    sinceHub += Self.watchInterval
+                    if sinceHub >= Self.persistentRecheck {
+                        sinceHub = .zero
+                        await self.refresh(force: true)
+                    }
                 }
             }
         }
