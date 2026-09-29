@@ -24,10 +24,13 @@ enum TriggerFire: Sendable, Hashable {
     case foreground
     case screen(String)
     case event(String)
+    /// Han llegado mensajes (al pedirlos al hub): solo para las de «en cuanto llegue».
+    case arrival
 
     func matches(_ t: Trigger) -> Bool {
         switch (self, t.on) {
         case (.launch, .launch), (.foreground, .foreground): true
+        case (.launch, .immediate), (.foreground, .immediate), (.arrival, .immediate): true
         case (.screen(let s), .screen): t.screen == s
         case (.event(let e), .event): t.event == e
         default: false
@@ -234,6 +237,8 @@ final class MessagesRuntime {
         refreshTask = task
         await task.value
         if refreshTask == task { refreshTask = nil }
+        // Las de «en cuanto llegue» salen ya, sin esperar a abrir o volver a la app.
+        if launchEvaluated { fire(.arrival) }
     }
 
     private func apply(_ response: MessagesResponse) {

@@ -232,6 +232,9 @@ public struct Presentation: Sendable, Hashable, Codable {
 public struct Trigger: Sendable, Hashable, Codable {
     public enum On: String, Sendable, Hashable, Codable, CaseIterable {
         case launch, foreground, screen, event
+        /// En cuanto llega: al abrir, al volver y también cuando el hub avisa de que hay algo nuevo,
+        /// aunque se esté usando la app. (Una versión antigua del paquete la trata como `launch`.)
+        case immediate
     }
 
     public var on: On
