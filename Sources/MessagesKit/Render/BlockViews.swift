@@ -388,6 +388,11 @@ public struct MessageButton: View {
     public var body: some View {
         let busy = handler?.isBusy ?? false
         styled
+            // Al actualizarse la campaña: si cambia el estilo, con desenfoque; si cambia el color,
+            // se funde (dentro de la animación con la que el presentador cambia el mensaje).
+            .id(button.style)
+            .transition(.blurReplace)
+            .animation(.smooth(duration: 0.35), value: button.style)
             .controlSize(.large)
             .fontDesign(theme.fontDesign)
             .buttonBorderShape(theme.buttonRadius.map { .roundedRectangle(radius: $0) } ?? .capsule)
