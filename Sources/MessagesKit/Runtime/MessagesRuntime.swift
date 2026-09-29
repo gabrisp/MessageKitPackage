@@ -262,6 +262,7 @@ final class MessagesRuntime {
             if let active = response.active {
                 activeIds = Set(active)
                 removeNoLongerActive()
+                removeDeliveredPushes(keeping: Set(active))
             }
             // Lo que está en pantalla (o esperando) pasa a su versión nueva si la has editado.
             for c in state.campaigns where c.forced != true {
@@ -292,6 +293,24 @@ final class MessagesRuntime {
         if let current = presenter.current, gone(current) {
             MessagesLog.debug("«\(current.campaign.name)» ya no le toca: se quita")
             presenter.dismiss(.programmatic, id: current.id)
+        }
+    }
+
+    /// Los pushes que ya llegaron (Centro de notificaciones) de campañas que ya no están activas
+    /// (pausadas, archivadas, borradas o que ya no le tocan) se quitan: tocarlos no abriría nada.
+    private func removeDeliveredPushes(keeping active: Set<String>) {
+        // Solo dentro de una app: fuera de un bundle `.app` el centro de avisos rompe.
+        guard Bundle.main.bundleURL.pathExtension == "app" else { return }
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let stale = await center.deliveredNotifications().filter { n in
+                guard let id = n.request.content.userInfo["campaignId"] as? String,
+                      n.request.content.userInfo["preview"] == nil else { return false }
+                return !active.contains(id)
+            }
+            guard !stale.isEmpty else { return }
+            center.removeDeliveredNotifications(withIdentifiers: stale.map(\.request.identifier))
+            MessagesLog.debug("Quitados \(stale.count) avisos de campañas que ya no están activas")
         }
     }
 
