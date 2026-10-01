@@ -605,6 +605,12 @@ final class MessagesRuntime {
             }
         case .openCampaign(let id):
             if let next = (state.campaigns + state.forced).first(where: { $0.id == id }) {
+                // Las que solo salen cuando otra las abre: con su calendario y su frecuencia
+                // (cuántas veces); si ya no toca, no sale.
+                if next.trigger.on == .manual, next.forced != true, !isEligibleLocally(next, now: .now) {
+                    MessagesLog.debug("Campaña encadenada \(id): ya no toca (frecuencia o calendario)")
+                    return
+                }
                 var chained = next
                 chained.priority = Int.max / 2
                 presenter.enqueue(MessageRequest(campaign: chained, language: language, mode: .live))

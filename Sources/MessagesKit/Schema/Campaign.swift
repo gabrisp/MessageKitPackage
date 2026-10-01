@@ -235,6 +235,10 @@ public struct Trigger: Sendable, Hashable, Codable {
         /// En cuanto llega: al abrir, al volver y también cuando el hub avisa de que hay algo nuevo,
         /// aunque se esté usando la app. (Una versión antigua del paquete la trata como `launch`.)
         case immediate
+        /// Nunca sale sola: solo cuando otra campaña la abre (acción `openCampaign`), y respetando
+        /// su frecuencia (cuántas veces). El hub no la manda a versiones del paquete que no lo
+        /// entienden (capacidad `manualTrigger`), que la tratarían como `launch`.
+        case manual
     }
 
     public var on: On
