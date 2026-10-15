@@ -1,6 +1,26 @@
 import SwiftUI
 
 public extension MessagePresenter {
+    /// Apunta en el registro de pruebas lo que mandaría un formulario y lo avisa en pantalla.
+    func recordTestForm(_ submission: FormSubmission, campaign: Campaign, language: String) {
+        let values = submission.values.sorted { $0.key < $1.key }.map { "\($0.key) = \($0.value)" }.joined(separator: ", ")
+        let action = MessageAction(.track(event: "form_submitted", properties: submission.values.mapValues { .string($0) }), trackAs: "form:\(submission.blockId)")
+        let entry = TestActionEntry(campaignName: campaign.name, action: action,
+                                    description: L.string("Enviaría el formulario: \(values.isEmpty ? "vacío" : values)",
+                                                          "Would send the form: \(values.isEmpty ? "empty" : values)", language: language))
+        testLog.insert(entry, at: 0)
+        showNotice(entry)
+    }
+
+    /// Lo que hace el «Enviar» de un formulario en las vistas previas: esperar un poco (como si
+    /// fuera por red) y apuntarlo.
+    internal func testFormSubmitter(campaign: Campaign, language: String) -> @MainActor (FormSubmission) async throws -> Void {
+        { [weak self] submission in
+            try? await Task.sleep(for: .milliseconds(500))
+            self?.recordTestForm(submission, campaign: campaign, language: language)
+        }
+    }
+
     /// Apunta en el registro de pruebas lo que haría una acción y lo avisa en pantalla.
     func recordTestAction(_ action: MessageAction, campaign: Campaign, language: String) {
         let entry = TestActionEntry(campaignName: campaign.name, action: action, description: ActionDescriber.describe(action, language: language, messageDismissible: campaign.dismissible))
@@ -36,9 +56,9 @@ public struct MessageInlinePreview: View {
             .environment(\.messagesTheme, theme)
             .environment(\.messageLanguage, language)
             .environment(\.locale, Locale(identifier: language))
-            .environment(\.messageActionHandler, MessageActionHandler { [presenter, campaign, language] in
+            .environment(\.messageActionHandler, MessageActionHandler({ [presenter, campaign, language] in
                 presenter.recordTestAction($0, campaign: campaign, language: language)
-            })
+            }, submit: presenter.testFormSubmitter(campaign: campaign, language: language)))
             .modifier(OptionalDynamicType(size: variant.dynamicTypeSize))
             .modifier(OptionalColorScheme(scheme: variant.colorScheme))
     }
@@ -137,8 +157,8 @@ public struct MessageBlockPreview: View {
             .environment(\.messagesTheme, theme)
             .environment(\.messageSurface, MessageSurface(style))
             .environment(\.messageLanguage, language)
-            .environment(\.messageActionHandler, MessageActionHandler { [presenter] in
+            .environment(\.messageActionHandler, MessageActionHandler({ [presenter] in
                 presenter.recordTestAction($0, campaign: testCampaign, language: language)
-            })
+            }, submit: presenter.testFormSubmitter(campaign: testCampaign, language: language)))
     }
 }

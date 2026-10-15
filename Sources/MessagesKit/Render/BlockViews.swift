@@ -11,10 +11,15 @@ public final class MessageActionHandler {
     /// Si el mensaje tiene una acción en marcha (una compra…): sus botones no responden.
     /// Se lee desde el presentador (observable), así que la vista se actualiza sola.
     let busy: @MainActor () -> Bool
+    /// Manda un formulario. Lanza si no ha llegado (el formulario lo dice y deja reintentar).
+    /// `nil`: no se manda a ningún sitio (se da por enviado).
+    let submit: (@MainActor (FormSubmission) async throws -> Void)?
 
-    public init(_ perform: @escaping @MainActor (MessageAction) -> Void, busy: @escaping @MainActor () -> Bool = { false }) {
+    public init(_ perform: @escaping @MainActor (MessageAction) -> Void, busy: @escaping @MainActor () -> Bool = { false },
+                submit: (@MainActor (FormSubmission) async throws -> Void)? = nil) {
         self.perform = perform
         self.busy = busy
+        self.submit = submit
     }
 
     public func callAsFunction(_ action: MessageAction) { perform(action) }
@@ -134,6 +139,7 @@ public struct BlockView: View {
         case .buttonRow(let b): ButtonRowView(row: b)
         case .countdown(let b): CountdownBlockView(block: b)
         case .web(let b): WebBlockView(block: b)
+        case .form(let b): FormBlockView(block: b, blockId: block.id)
         case .unknown: EmptyView()
         }
     }
@@ -373,6 +379,10 @@ struct BadgeBlockView: View {
 public struct MessageButton: View {
     let button: Block.Button
     var fillsWidth = true
+    /// Lo que hace al pulsarlo en lugar de su acción (el «Enviar» de un formulario).
+    var onTap: (@MainActor () -> Void)?
+    /// Ruedita propia (el formulario mientras se envía). `nil` = la del mensaje.
+    var isLoading: Bool?
     @Environment(\.messagesTheme) private var theme
     @Environment(\.messageActionHandler) private var handler
     /// Para saber lo claro que es el color del botón en el modo actual (claro u oscuro).
@@ -385,8 +395,14 @@ public struct MessageButton: View {
         self.fillsWidth = fillsWidth
     }
 
+    init(button: Block.Button, onTap: @escaping @MainActor () -> Void, isLoading: Bool) {
+        self.button = button
+        self.onTap = onTap
+        self.isLoading = isLoading
+    }
+
     public var body: some View {
-        let busy = handler?.isBusy ?? false
+        let busy = (handler?.isBusy ?? false) || isLoading == true
         styled
             // Al actualizarse la campaña: si cambia el estilo, con desenfoque; si cambia el color,
             // se funde (dentro de la animación con la que el presentador cambia el mensaje).
@@ -407,7 +423,7 @@ public struct MessageButton: View {
     }
 
     private var label: some View {
-        let loading = pressed && (handler?.isBusy ?? false)
+        let loading = isLoading ?? (pressed && (handler?.isBusy ?? false))
         return Group {
             if let symbol = button.symbol {
                 Label(button.title, systemImage: symbol)
@@ -464,7 +480,8 @@ public struct MessageButton: View {
     }
 
     private func tap() {
-        guard handler?.isBusy != true else { return }
+        guard handler?.isBusy != true, isLoading != true else { return }
+        if let onTap { onTap(); return }
         pressed = true
         handler?(button.action)
     }

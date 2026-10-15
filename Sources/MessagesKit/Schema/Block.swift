@@ -34,6 +34,7 @@ public struct Block: Sendable, Hashable, Codable, Identifiable {
         case buttonRow(ButtonRow)
         case countdown(Countdown)
         case web(Web)
+        case form(Form)
         case unknown(type: String, raw: JSONValue)
     }
 
@@ -52,13 +53,14 @@ public struct Block: Sendable, Hashable, Codable, Identifiable {
         case .buttonRow: "buttonRow"
         case .countdown: "countdown"
         case .web: "web"
+        case .form: "form"
         case .unknown(let type, _): type
         }
     }
 
     public static let allTypes = [
         "heading", "text", "image", "icon", "list", "stat", "badge",
-        "spacer", "divider", "button", "buttonRow", "countdown", "web",
+        "spacer", "divider", "button", "buttonRow", "countdown", "web", "form",
     ]
 
     /// Todas las acciones que lleva el bloque (para validar capacidades).
@@ -295,6 +297,90 @@ public struct Block: Sendable, Hashable, Codable, Identifiable {
         }
     }
 
+    /// Un formulario: uno o varios campos y un botón de enviar. La respuesta va al hub (función
+    /// `forms`) con la campaña, la app y el usuario. Pensado sobre todo para pedir el email.
+    public struct Form: Sendable, Hashable, Codable {
+        public struct Field: Sendable, Hashable, Codable, Identifiable {
+            public enum FieldType: String, Sendable, Hashable, Codable, CaseIterable {
+                case email, text, multiline, phone, number
+            }
+
+            /// La clave del valor en la respuesta (`email`, `name`…). Igual en todos los idiomas.
+            public var id: String
+            public var label: String
+            public var placeholder: String?
+            public var type: FieldType
+            public var required: Bool
+
+            public init(id: String, label: String, placeholder: String? = nil, type: FieldType = .text, required: Bool = false) {
+                self.id = id; self.label = label; self.placeholder = placeholder; self.type = type; self.required = required
+            }
+
+            public init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                id = c.value(.id, default: Block.newId())
+                label = c.value(.label, default: "")
+                placeholder = c.optional(.placeholder)
+                type = c.value(.type, default: .text)
+                required = c.value(.required, default: false)
+            }
+
+            /// Si el valor vale para este campo: obligatorio con algo escrito y, si es email, con
+            /// forma de email. Devuelve el problema (en el idioma del mensaje) o `nil`.
+            public func problem(with value: String, language: String = L.current) -> String? {
+                let v = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                if v.isEmpty {
+                    return required ? L.string("Este campo es obligatorio.", "This field is required.", language: language) : nil
+                }
+                if v.count > Form.maxValueLength {
+                    return L.string("Es demasiado largo.", "It's too long.", language: language)
+                }
+                switch type {
+                case .email where !Form.isEmail(v):
+                    return L.string("Escribe un email válido.", "Enter a valid email.", language: language)
+                case .number where Double(v.replacingOccurrences(of: ",", with: ".")) == nil:
+                    return L.string("Escribe un número.", "Enter a number.", language: language)
+                case .phone where v.filter(\.isNumber).count < 6:
+                    return L.string("Escribe un teléfono válido.", "Enter a valid phone number.", language: language)
+                default:
+                    return nil
+                }
+            }
+        }
+
+        public var fields: [Field]
+        public var submitTitle: String
+        public var submitStyle: Button.Style
+        /// Lo que se ve al enviar (en lugar de los campos). `nil` = «¡Gracias!».
+        public var successText: String?
+        /// Si el mensaje se cierra solo un momento después de enviar.
+        public var thenDismiss: Bool
+
+        public init(fields: [Field], submitTitle: String = "Enviar", submitStyle: Button.Style = .primary, successText: String? = nil, thenDismiss: Bool = true) {
+            self.fields = fields; self.submitTitle = submitTitle; self.submitStyle = submitStyle
+            self.successText = successText; self.thenDismiss = thenDismiss
+        }
+
+        public init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            fields = try c.decode([Field].self, forKey: .fields)
+            submitTitle = c.value(.submitTitle, default: "Enviar")
+            submitStyle = c.value(.submitStyle, default: .primary)
+            successText = c.optional(.successText)
+            thenDismiss = c.value(.thenDismiss, default: true)
+        }
+
+        /// Lo más largo que se guarda de un valor (el hub aplica el mismo tope).
+        public static let maxValueLength = 2000
+        /// Cuántos campos como mucho (el hub aplica el mismo tope).
+        public static let maxFields = 8
+
+        /// Validación básica: algo@algo.tld, sin espacios. La de verdad la hace quien escribe.
+        public static func isEmail(_ s: String) -> Bool {
+            s.wholeMatch(of: /[^@\s]+@[^@\s]+\.[^@\s]{2,}/) != nil
+        }
+    }
+
     // MARK: Codable
 
     private enum CodingKeys: String, CodingKey { case id, type }
@@ -318,6 +404,7 @@ public struct Block: Sendable, Hashable, Codable, Identifiable {
         case "buttonRow": payload(ButtonRow.self).map(Kind.buttonRow)
         case "countdown": payload(Countdown.self).map(Kind.countdown)
         case "web": payload(Web.self).map(Kind.web)
+        case "form": payload(Form.self).map(Kind.form)
         default: nil
         }
         kind = known ?? .unknown(type: type, raw: (try? JSONValue(from: decoder)) ?? .null)
@@ -338,6 +425,7 @@ public struct Block: Sendable, Hashable, Codable, Identifiable {
         case .buttonRow(let v): try v.encode(to: encoder)
         case .countdown(let v): try v.encode(to: encoder)
         case .web(let v): try v.encode(to: encoder)
+        case .form(let v): try v.encode(to: encoder)
         case .unknown(_, let raw):
             try raw.encode(to: encoder)
             return

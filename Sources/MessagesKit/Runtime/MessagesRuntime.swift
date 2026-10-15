@@ -98,6 +98,7 @@ final class MessagesRuntime {
         presenter.onShown = { [weak self] in self?.didShow($0) }
         presenter.onDismissed = { [weak self] in self?.didDismiss($0, reason: $1) }
         presenter.onLiveAction = { [weak self] in self?.didTap($1, in: $0) }
+        presenter.onFormSubmit = { [weak self] in try await self?.submitForm($1, in: $0) }
     }
 
     // MARK: Configuración
@@ -531,6 +532,30 @@ final class MessagesRuntime {
             if !immediately { try? await Task.sleep(for: .milliseconds(500)) }
             guard !Task.isCancelled, let snapshot = self?.state else { return }
             await store.save(snapshot)
+        }
+    }
+
+    // MARK: Formularios
+
+    /// Manda una respuesta de formulario al hub (función `forms`), con los atributos del usuario
+    /// en ese momento. Si no llega, lanza: el formulario lo dice y deja reintentar (con el mismo
+    /// id, así que no se duplica). Cuenta como acción (frecuencia «hasta que actúe»).
+    func submitForm(_ submission: FormSubmission, in r: MessageRequest) async throws {
+        guard let config, let client else { throw HubError.http(0, "MessagesKit sin configurar") }
+        let body = FormRequest(
+            appId: config.appId, publicKey: config.publicKey, userId: await userId(),
+            id: submission.id, campaignId: r.campaign.id, blockId: submission.blockId, language: r.language,
+            values: submission.values, attributes: await attributes(), test: isPreview(r)
+        )
+        struct Ack: Decodable, Sendable {}
+        _ = try await client.call("forms", body, as: Ack.self)
+        MessagesLog.debug("Formulario de «\(r.campaign.name)» enviado")
+        // Lo escrito no va a la analítica: solo que se ha enviado.
+        if isPreview(r) {
+            record(.action, r, actionId: "\(Self.previewActionId):form:\(submission.blockId)")
+        } else {
+            state.history[r.campaign.id, default: .init()].actedAt = .now
+            record(.action, r, actionId: "form:\(submission.blockId)")
         }
     }
 

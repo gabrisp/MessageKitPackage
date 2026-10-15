@@ -12,7 +12,7 @@ public struct Capabilities: Sendable, Hashable, Codable {
     /// uno que la app no tenga, para no dejar botones muertos en versiones antiguas).
     public var features: [String]
 
-    public static let supportedFeatures = ["purchase", "refresh", "manualTrigger"]
+    public static let supportedFeatures = ["purchase", "refresh", "manualTrigger", "form"]
 
     public init(routes: [String], actions: [String], blocksVersion: Int = messagesBlocksVersion, schemaVersion: Int = messagesSchemaVersion, features: [String] = Capabilities.supportedFeatures) {
         self.routes = routes; self.actions = actions
@@ -103,6 +103,37 @@ public struct EventsRequest: Sendable, Codable {
     public var publicKey: String
     public var userId: String
     public var events: [Impression]
+}
+
+/// Lo que el usuario ha escrito en un formulario (bloque `form`), antes de mandarlo.
+public struct FormSubmission: Sendable, Hashable {
+    /// Id de la respuesta, generado en el dispositivo: reintentar la misma no la duplica.
+    public var id: String
+    /// El bloque `form` de la campaña.
+    public var blockId: String
+    /// Clave del campo → lo escrito (sin espacios a los lados).
+    public var values: [String: String]
+
+    public init(id: String = UUID().uuidString.lowercased(), blockId: String, values: [String: String]) {
+        self.id = id; self.blockId = blockId; self.values = values
+    }
+}
+
+/// Cuerpo de la función `forms`: guarda una respuesta de formulario.
+public struct FormRequest: Sendable, Codable {
+    public var appId: String
+    public var publicKey: String
+    public var userId: String
+    /// Id de la respuesta, generado en el dispositivo: reintentar no duplica.
+    public var id: String
+    public var campaignId: String
+    public var blockId: String
+    public var language: String
+    public var values: [String: String]
+    /// Los atributos del usuario en ese momento (versión, Pro…), para saber a quién escribes.
+    public var attributes: [String: JSONValue]
+    /// Una prueba («Enviar a un usuario»): el admin la marca como tal.
+    public var test: Bool
 }
 
 /// Cuerpo de la función `devices`: registra el token de avisos y los topics.

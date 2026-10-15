@@ -86,6 +86,11 @@ public struct Campaign: Sendable, Hashable, Codable, Identifiable {
         return out
     }
 
+    /// Si tiene algún formulario (en cualquier idioma): las respuestas se ven en Resultados.
+    public var hasForm: Bool {
+        content.values.contains { $0.contains { if case .form = $0.kind { true } else { false } } }
+    }
+
     /// Rutas y acciones propias que la app tiene que saber hacer para mostrar esta campaña.
     public var requiredCapabilities: (routes: Set<String>, actions: Set<String>) {
         var routes = Set<String>(), actions = Set<String>()

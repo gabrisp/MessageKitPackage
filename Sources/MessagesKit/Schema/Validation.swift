@@ -46,6 +46,9 @@ public enum CampaignValidator {
                 if case .button(let btn) = b.kind, btn.title.trimmingCharacters(in: .whitespaces).isEmpty {
                     error(L.string("Hay un botón sin título en \(lang).", "There's a button with no title in \(lang)."))
                 }
+                if case .form(let form) = b.kind {
+                    for m in formIssues(form, lang: lang) { out.append(m) }
+                }
             }
         }
 
@@ -137,6 +140,32 @@ public enum CampaignValidator {
             if (p.title[c.defaultLanguage] ?? "").isEmpty { error(L.string("El push no tiene título en el idioma por defecto.", "The push has no title in the default language.")) }
             if p.when == .at, p.at == nil { error(L.string("El push programado no tiene fecha.", "The scheduled push has no date.")) }
             if p.when == .recurring, p.time == nil { error(L.string("El push recurrente no tiene hora.", "The recurring push has no time.")) }
+        }
+        return out
+    }
+
+    /// Lo que tiene que cumplir un formulario: algún campo, claves únicas y no vacías, y un
+    /// botón con título. Las claves son las columnas de las respuestas en el admin.
+    static func formIssues(_ f: Block.Form, lang: String) -> [ValidationIssue] {
+        var out: [ValidationIssue] = []
+        func error(_ m: String) { out.append(.init(severity: .error, message: m)) }
+        func warning(_ m: String) { out.append(.init(severity: .warning, message: m)) }
+        if f.fields.isEmpty { error(L.string("Hay un formulario sin campos en \(lang).", "There's a form with no fields in \(lang).")) }
+        if f.fields.count > Block.Form.maxFields {
+            error(L.string("Un formulario admite \(Block.Form.maxFields) campos como mucho (\(lang)).", "A form takes up to \(Block.Form.maxFields) fields (\(lang))."))
+        }
+        let keys = f.fields.map { $0.id.trimmingCharacters(in: .whitespaces) }
+        if keys.contains(where: \.isEmpty) { error(L.string("Hay un campo de formulario sin clave en \(lang).", "There's a form field with no key in \(lang).")) }
+        if Set(keys).count != keys.count { error(L.string("Dos campos del formulario tienen la misma clave en \(lang).", "Two form fields share the same key in \(lang).")) }
+        if keys.contains(where: { !$0.isEmpty && $0.wholeMatch(of: /[A-Za-z0-9_.-]{1,64}/) == nil }) {
+            error(L.string("Las claves de los campos solo pueden llevar letras, números, «_», «-» y «.» (hasta 64) en \(lang).",
+                           "Field keys can only have letters, digits, “_”, “-” and “.” (up to 64) in \(lang)."))
+        }
+        if f.fields.contains(where: { $0.label.trimmingCharacters(in: .whitespaces).isEmpty && ($0.placeholder ?? "").isEmpty }) {
+            warning(L.string("Hay un campo de formulario sin etiqueta ni texto de ejemplo en \(lang).", "There's a form field with no label or placeholder in \(lang)."))
+        }
+        if f.submitTitle.trimmingCharacters(in: .whitespaces).isEmpty {
+            error(L.string("El botón del formulario no tiene título en \(lang).", "The form button has no title in \(lang)."))
         }
         return out
     }

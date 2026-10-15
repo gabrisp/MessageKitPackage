@@ -127,6 +127,7 @@ public final class MessagePresenter {
     var onShown: (@MainActor (MessageRequest) -> Void)?
     var onDismissed: (@MainActor (MessageRequest, DismissReason) -> Void)?
     var onLiveAction: (@MainActor (MessageRequest, MessageAction) -> Void)?
+    var onFormSubmit: (@MainActor (MessageRequest, FormSubmission) async throws -> Void)?
 
     var system = SystemActions()
     /// Mensajes con una acción en marcha (compra, permiso de avisos…): sus botones no responden.
@@ -263,8 +264,33 @@ public final class MessagePresenter {
     func handler(for request: MessageRequest) -> MessageActionHandler {
         MessageActionHandler(
             { [weak self] action in self?.handle(action, from: request) },
-            busy: { [weak self] in self?.busyRequestIds.contains(request.id) ?? false }
+            busy: { [weak self] in self?.busyRequestIds.contains(request.id) ?? false },
+            submit: { [weak self] submission in try await self?.submit(submission, from: request) }
         )
+    }
+
+    /// El «Enviar» de un formulario. De verdad lo manda el runtime al hub; en modo prueba solo se
+    /// apunta lo que se mandaría. Si el formulario lo pide, el mensaje se cierra un momento después
+    /// (con el «¡Gracias!» ya en pantalla).
+    func submit(_ submission: FormSubmission, from request: MessageRequest) async throws {
+        switch request.mode {
+        case .live:
+            try await onFormSubmit?(request, submission)
+        case .test:
+            try? await Task.sleep(for: .milliseconds(500))
+            recordTestForm(submission, campaign: request.campaign, language: request.language)
+        case .local:
+            break
+        }
+        let form = request.blocks.lazy.compactMap { b -> Block.Form? in
+            if case .form(let f) = b.kind, b.id == submission.blockId { f } else { nil }
+        }.first
+        if form?.thenDismiss == true {
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(1.6))
+                self?.dismiss(.action, id: request.id)
+            }
+        }
     }
 
     public func clearTestLog() { testLog.removeAll() }
